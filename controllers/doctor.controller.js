@@ -4,43 +4,73 @@ const pool = require("../db");
 
 //this is for doctor db
 //get /api/doctor/patients
+
+
+
+// GET ALL PATIENTS
+
 exports.getAllPatients = async (req, res) => {
   try {
+    console.log("📤 Fetching all patients...");
 
-    //return data from patiends table
-    //order by id desc to get latest patient first
-    const result = await pool.query(
-      "SELECT * FROM patients ORDER BY id DESC"
-    );
+    const result = await pool.query(`
+      SELECT *
+      FROM patients
+      ORDER BY 
+        CASE 
+          WHEN risk_level = 'High' THEN 1
+          WHEN risk_level = 'Moderate' THEN 2
+          ELSE 3
+        END,
+        created_at DESC
+    `);
 
-    //result.rows me db ka data ata hai
-    res.json({ patients: result.rows });
+    console.log(`✅ ${result.rows.length} patients fetched`);
 
-    //error for db print
+    return res.status(200).json({
+      count: result.rows.length,
+      patients: result.rows
+    });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Database error" });
+    console.error("🔥 Error fetching patients:", error.message);
+    return res.status(500).json({ error: "Database error" });
   }
 };
 
-//function for patient detail
-//get /api/doctor/patient/:id
+
+
+
+// GET PATIENT BY ID
 
 exports.getPatientById = async (req, res) => {
   try {
-    //get id from url
     const { id } = req.params;
 
+    console.log("📤 Fetching patient with ID:", id);
 
-    //return data from patients table where id matches
+    // Validate ID
+    if (!id || isNaN(Number(id))) {
+      console.log("❌ Invalid patient ID");
+      return res.status(400).json({ error: "Invalid patient ID" });
+    }
+
     const result = await pool.query(
       "SELECT * FROM patients WHERE id = $1",
-      [id] //value for $1 is id from url
+      [id]
     );
 
-    res.json(result.rows[0]);
+    if (result.rows.length === 0) {
+      console.log("❌ Patient not found");
+      return res.status(404).json({ error: "Patient not found" });
+    }
+
+    console.log("✅ Patient found");
+
+    return res.status(200).json(result.rows[0]);
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Database error" });
+    console.error("🔥 Error fetching patient:", error.message);
+    return res.status(500).json({ error: "Database error" });
   }
 };
