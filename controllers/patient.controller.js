@@ -1,6 +1,8 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
 const pool = require("../db");
 const { calculateRisk } = require("../services/scoring.service");
+const { generateExplanation } = require("../services/ai.service");
 
 exports.submitPatient = async (req, res) => {
   try {
@@ -12,8 +14,7 @@ exports.submitPatient = async (req, res) => {
       painLevel,
       symptoms,
       canWalk,
-      hasSwelling,
-      aiSummary
+      hasSwelling
     } = req.body;
 
     // ✅ Basic validation
@@ -27,6 +28,9 @@ exports.submitPatient = async (req, res) => {
     // ✅ Calculate risk safely
     const riskLevel = calculateRisk(painLevel);
     console.log("🧠 Risk calculated:", riskLevel);
+
+    const aiSummary = await generateExplanation(riskLevel);
+    console.log("🤖 AI summary generated:", aiSummary);
 
     // ✅ Insert into DB
     const result = await pool.query(
@@ -51,7 +55,9 @@ exports.submitPatient = async (req, res) => {
     return res.status(201).json({
       message: "Patient submitted successfully",
       patientId: result.rows[0].id,
-      riskLevel: result.rows[0].risk_level
+      riskLevel: result.rows[0].risk_level,
+      aiSummary: aiSummary
+
     });
 
   } catch (error) {

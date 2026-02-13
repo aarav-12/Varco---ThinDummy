@@ -4,6 +4,6 @@ const router = express.Router();
 
 const chatController = require("../controllers/chat.controller");
 
-router.post("/", chatController.getChatResponse);
+router.post("/", chatController.chatWithAI);
 
 module.exports = router;

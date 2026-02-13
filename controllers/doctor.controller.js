@@ -30,7 +30,7 @@ exports.getAllPatients = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("🔥 Error fetching patients:", error.message);
+    console.error("Error fetching patients:", error.message);
     return res.status(500).json({ error: "Database error" });
   }
 };
