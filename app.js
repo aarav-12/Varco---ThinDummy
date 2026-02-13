@@ -15,6 +15,11 @@ app.use(express.json());
 app.use("/api/patient", patientRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/doctor", doctorRoutes);
+app.use((req, res, next) => {
+  console.log("➡ Incoming request:", req.method, req.originalUrl);
+  next();
+});
+
 
 app.get("/", (req, res) => {
   res.json({ status: "Backend running" });

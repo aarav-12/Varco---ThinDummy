@@ -5,6 +5,8 @@ const { calculateRisk } = require("../services/scoring.service");
 
 exports.chatWithAI = async (req, res) => {
   try {
+    console.log("🔥 chatWithAI hit");
+
     const { painLevel, symptoms } = req.body;
 
     // ✅ Validate painLevel properly
@@ -43,9 +45,16 @@ Keep it concise.
 `;
 
     console.log("Structured Prompt:\n", prompt);
+console.log("⚡ About to call generateExplanation");
 
     // ✅ Generate AI explanation
-    const aiResponse = await generateExplanation(riskLevel);
+   const aiResponse = await generateExplanation({
+  painLevel: numericPainLevel,
+  riskLevel,
+  symptoms
+});console.log("⚡ generateExplanation returned");
+
+    console.log("AI Response:\n", aiResponse);
 
     return res.status(200).json({
       painLevel: numericPainLevel,
