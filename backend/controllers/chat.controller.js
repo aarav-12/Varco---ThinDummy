@@ -1,35 +1,36 @@
 /* eslint-disable no-undef */
 
-const pool = require("../db"); // ✅ Fixed path
-const { generateExplanation } = require("../services/ai.service");
+const pool = require("../db");
+const { generateChatResponse } = require("../services/chatAI.service");
 const { calculateRisk } = require("../services/scoring.service");
 
+// 🔹 TRIAGE CHAT (pain-based)
 exports.chatWithAI = async (req, res) => {
   try {
     console.log("🔥 chatWithAI hit");
 
     const { painLevel, symptoms } = req.body;
 
-    // ✅ Validate painLevel properly
+    // ✅ Validate painLevel
     if (painLevel === undefined || isNaN(Number(painLevel))) {
       return res.status(400).json({
         error: "Valid numeric painLevel is required"
       });
     }
 
-    // ✅ Convert to number safely
     const numericPainLevel = Number(painLevel);
 
     if (numericPainLevel < 0 || numericPainLevel > 10) {
-      return res.status(400).json({ error: "..." });
+      return res.status(400).json({
+        error: "Pain level must be between 0 and 10"
+      });
     }
 
-    // ✅ Recalculate risk on backend (DO NOT trust client)
+    // ✅ Backend risk calculation
     const riskLevel = calculateRisk(numericPainLevel);
-
     console.log("Computed Risk Level:", riskLevel);
 
-    // (Optional future AI prompt structure)
+    // ✅ Structured prompt (kept for future LLM upgrade)
     const prompt = `
 You are a medical triage assistant.
 
@@ -45,17 +46,14 @@ Keep it concise.
 `;
 
     console.log("Structured Prompt:\n", prompt);
-    console.log("⚡ About to call generateExplanation");
 
-    // ✅ Generate AI explanation
-    const aiResponse = await generateExplanation({
+    // ✅ Call Chat AI Service
+    const aiResponse = await generateChatResponse({
       painLevel: numericPainLevel,
       riskLevel,
-      symptoms
+      symptoms,
+      prompt
     });
-
-    console.log("⚡ generateExplanation returned");
-    console.log("AI Response:\n", aiResponse);
 
     return res.status(200).json({
       painLevel: numericPainLevel,
@@ -72,23 +70,22 @@ Keep it concise.
 };
 
 
-exports.sendMessage = async (req,res) => {
+// 🔹 STORE CHAT MESSAGE
+exports.sendMessage = async (req, res) => {
   try {
-    const {patientId, message, sender} = req.body;
+    const { patientId, message, sender } = req.body;
 
-    //validation here
     if (!patientId || !sender || !message) {
       return res.status(400).json({ error: "All fields required" });
     }
 
     const query = `
-            INSERT INTO chat_messages (patient_id, sender, message)
-            VALUES ($1, $2, $3)
-            RETURNING *;
-        `;
+      INSERT INTO chat_messages (patient_id, sender, message)
+      VALUES ($1, $2, $3)
+      RETURNING *;
+    `;
 
     const values = [patientId, sender, message];
-
     const result = await pool.query(query, values);
 
     return res.status(201).json({
@@ -103,7 +100,7 @@ exports.sendMessage = async (req,res) => {
 };
 
 
-// ✅ Added getMessages function (was missing)
+// 🔹 GET CHAT HISTORY
 exports.getMessages = async (req, res) => {
   try {
     const { patientId } = req.params;
