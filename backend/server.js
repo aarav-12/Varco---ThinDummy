@@ -6,6 +6,10 @@ const app = require("./app");
 const PORT = process.env.PORT || 5000;
 const listEndpoints = require("express-list-endpoints");
 console.log(listEndpoints(app));
+const biologicalClockRoutes =
+require("./routes/biologicalClock.routes");
+
+app.use("/api/biological-age", biologicalClockRoutes);
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
