@@ -4,5 +4,8 @@
   "scripts": {
     "start": "npm --prefix backend run start",
     "dev": "npm --prefix backend run dev"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }
