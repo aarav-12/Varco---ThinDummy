@@ -1,7 +1,8 @@
 /* eslint-disable no-unused-vars */
 /* eslint-disable no-undef */
+
 const pool = require("../db");
-const { calculateRisk } = require("../services/scoring.service");
+const { runAlgorithm } = require("../services/algorithm.service");
 const { generateExplanation } = require("../services/ai.service");
 
 exports.submitPatient = async (req, res) => {
@@ -11,6 +12,7 @@ exports.submitPatient = async (req, res) => {
     const {
       name,
       age,
+      gender,
       painLevel,
       symptoms,
       canWalk,
@@ -19,33 +21,46 @@ exports.submitPatient = async (req, res) => {
 
     // ✅ Basic validation
     if (!name || painLevel === undefined) {
-      console.log("❌ Validation failed: name or painLevel missing");
       return res.status(400).json({
         error: "Name and painLevel are required"
       });
     }
 
-    // ✅ Calculate risk safely
-    const riskLevel = calculateRisk(painLevel);
-    console.log("🧠 Risk calculated:", riskLevel);
+    // ✅ Build rawInputs object (source of truth)
+    const rawInputs = {
+      painLevel,
+      symptoms: symptoms || null,
+      canWalk: canWalk ?? null,
+      hasSwelling: hasSwelling ?? null
+    };
 
-    const aiSummary = await generateExplanation(riskLevel);
-    console.log("🤖 AI summary generated:", aiSummary);
+    // ✅ Run algorithm service
+    const algoResult = runAlgorithm(rawInputs, age);
 
-    // ✅ Insert into DB
+    console.log("🧠 Algorithm output:", algoResult);
+
+    // ✅ Generate AI explanation (based on severity or deviation)
+   const aiSummary = await generateExplanation({
+  deviation: algoResult.deviation,
+  severity: algoResult.biomarkerSeverity
+});
+
+
+    // ✅ Insert structured data into DB
     const result = await pool.query(
       `INSERT INTO patients 
-      (name, age, pain_level, symptoms, can_walk, has_swelling, risk_level, ai_summary)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-       RETURNING id, risk_level`,
+      (name, age, gender, raw_inputs, biomarkers, risk_scores, biological_age, chronological_age, ai_summary)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING id, biological_age`,
       [
         name,
         age || null,
-        painLevel,
-        symptoms || null,
-        canWalk ?? null,
-        hasSwelling ?? null,
-        riskLevel,
+        gender || null,
+        rawInputs,
+        algoResult.biomarkers,
+        algoResult.biomarkerSeverity,
+        algoResult.biologicalAge,
+        age || null,
         aiSummary || null
       ]
     );
@@ -55,16 +70,18 @@ exports.submitPatient = async (req, res) => {
     return res.status(201).json({
       message: "Patient submitted successfully",
       patientId: result.rows[0].id,
-      riskLevel: result.rows[0].risk_level,
-      aiSummary: aiSummary
-
+      biologicalAge: result.rows[0].biological_age,
+      deviation: algoResult.deviation,
+      biomarkers: algoResult.biomarkers,
+      severity: algoResult.biomarkerSeverity,
+      aiSummary
     });
 
   } catch (error) {
     console.error("🔥 ERROR in submitPatient:", error.message);
 
-    return res.status(400).json({
-      error: error.message
+    return res.status(500).json({
+      error: "Submission failed"
     });
   }
 };
