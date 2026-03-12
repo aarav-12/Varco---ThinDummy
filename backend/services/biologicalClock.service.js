@@ -214,7 +214,21 @@ function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights
   };
 }
 
+function calculateRiskScore(compositeScore) {
 
+  let riskScore = compositeScore * 2.5;
+
+  if (riskScore > 10) riskScore = 10;
+  if (riskScore < 0) riskScore = 0;
+
+  return Number(riskScore.toFixed(2));
+}
+function calculateClockAngle(riskScore) {
+
+  const angle = (riskScore / 10) * 180 - 90;
+
+  return Number(angle.toFixed(2));
+}
 
 // EXPORTS
 
@@ -228,6 +242,9 @@ module.exports = {
   calculateCompositeScore,
   calculateBiologicalAge,
   calculateConfidence,
-  runBiologicalClock
+  runBiologicalClock,
+  calculateRiskScore,
+  calculateClockAngle
+
 
 };

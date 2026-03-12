@@ -1,44 +1,32 @@
-const {
-  generateAuthUrl,
-  getTokens,
-  createCalendarEvent,
-} = require("../services/googleCalendarService");
+const { createCalendarEvent } = require("../services/googleCalendarService");
 
-const connectGoogleCalendar = (req, res) => {
-
-  const url = generateAuthUrl();
-
-  res.redirect(url);
-};
-
-const googleCallback = async (req, res) => {
-
-  const { code } = req.query;
-
-  await getTokens(code);
-
-  res.send("Google Calendar Connected");
-};
-
+// Book consultation
 const bookConsultation = async (req, res) => {
+  try {
+    const { patientName, email, startTime, endTime } = req.body;
 
-  const { patientName, startTime, endTime } = req.body;
+    const event = await createCalendarEvent({
+      patientName,
+      email,
+      startTime,
+      endTime,
+    });
 
-  const event = await createCalendarEvent({
-    patientName,
-    startTime,
-    endTime,
-  });
+    res.json({
+      message: "Consultation booked",
+      eventId: event.id,
+      eventLink: event.htmlLink,
+      meetLink: event.hangoutLink || null,
+    });
 
- res.json({
-  message: "Consultation booked",
-  eventId: event.id,
-  eventLink: event.htmlLink
-});
+  } catch (error) {
+    console.error("Calendar booking error:", error);
+    res.status(500).json({
+      message: "Failed to book consultation",
+    });
+  }
 };
 
 module.exports = {
-  connectGoogleCalendar,
-  googleCallback,
   bookConsultation,
 };

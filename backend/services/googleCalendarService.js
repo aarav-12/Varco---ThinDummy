@@ -1,49 +1,58 @@
 const { google } = require("googleapis");
-const dotenv = require("dotenv");
+const path = require("path");
 
-dotenv.config();
-// console.log("EVENT LINK:", response.data.htmlLink);
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URI
-);
+// Service Account Authentication
+const auth = new google.auth.GoogleAuth({
+  keyFile: path.join(__dirname, "service-account.json"),
+  scopes: ["https://www.googleapis.com/auth/calendar"],
+});
 
-const generateAuthUrl = () => {
-  return oauth2Client.generateAuthUrl({
-    access_type: "offline",
-    scope: ["https://www.googleapis.com/auth/calendar"],
+const calendar = google.calendar({
+  version: "v3",
+  auth,
+});
+
+// Check if the time slot is available
+const checkAvailability = async (startTime, endTime) => {
+  const response = await calendar.freebusy.query({
+    requestBody: {
+      timeMin: startTime,
+      timeMax: endTime,
+      timeZone: "Asia/Kolkata",
+      items: [{ id: "primary" }],
+    },
   });
+
+  const busySlots = response.data.calendars.primary.busy;
+
+  return busySlots.length === 0;
 };
 
-const getTokens = async (code) => {
-  const { tokens } = await oauth2Client.getToken(code);
-  oauth2Client.setCredentials(tokens);
-
-  global.googleTokens = tokens;
-
-  return tokens;
-};
-
+// Create calendar event
 const createCalendarEvent = async (eventData) => {
-  oauth2Client.setCredentials(global.googleTokens);
+  const { patientName, email, startTime, endTime } = eventData;
 
-  const calendar = google.calendar({
-    version: "v3",
-    auth: oauth2Client,
-  });
+  // Check availability first
+  const isAvailable = await checkAvailability(startTime, endTime);
+
+  if (!isAvailable) {
+    throw new Error("Time slot already booked");
+  }
 
   const event = {
-    summary: `Doctor Consultation - ${eventData.patientName}`,
+    summary: `Doctor Consultation - ${patientName}`,
     description: "Doctor consultation booking",
     start: {
-      dateTime: eventData.startTime,
+      dateTime: startTime,
       timeZone: "Asia/Kolkata",
     },
     end: {
-      dateTime: eventData.endTime,
+      dateTime: endTime,
       timeZone: "Asia/Kolkata",
     },
+
+    attendees: [{ email }],
+
     conferenceData: {
       createRequest: {
         requestId: "consultation-" + Date.now(),
@@ -56,13 +65,12 @@ const createCalendarEvent = async (eventData) => {
     calendarId: "primary",
     resource: event,
     conferenceDataVersion: 1,
+    sendUpdates: "all",
   });
 
   return response.data;
 };
 
 module.exports = {
-  generateAuthUrl,
-  getTokens,
   createCalendarEvent,
 };
