@@ -11,11 +11,13 @@ const {
 
 const { normalizeUnits } = require("../services/biomarkerSanitizer");
 const { mapBiomarkers } = require("../utils/biomarkerMapper");
+const { adaptBiomarkerInput } = require("../utils/biomarkerInputAdapter");
+const { generateInsights } = require("../services/insightEngine");
 
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
 
-const { adaptBiomarkerInput } = require("../utils/biomarkerInputAdapter");
+
 // -----------------------------------------
 // BIOLOGICAL AGE CONTROLLER
 // -----------------------------------------
@@ -35,34 +37,29 @@ const calculateBiologicalAgeController = (req, res) => {
       });
     }
 
-   const { biomarkers: rawBiomarkers, age } = req.body;
+    const { biomarkers: rawBiomarkers, age } = req.body;
 
-// 🔥 NEW: adapt AI or manual input
-const biomarkers = adaptBiomarkerInput(rawBiomarkers);
+    // STEP 0: Adapt input (AI / manual)
+    const biomarkers = adaptBiomarkerInput(rawBiomarkers);
+
     const reference = biomarkerReference;
 
     console.log("REFERENCE KEYS:", Object.keys(reference));
 
-    // -----------------------------
-    // STEP 1: Alias Mapping
-    // -----------------------------
+    // STEP 1: Mapping
     const mappedBiomarkers = mapBiomarkers(biomarkers);
-//techncally this is deduplicate after mapping
-    const dedupedBiomarkers = {};
 
-for (const key in mappedBiomarkers) {
-  dedupedBiomarkers[key] = mappedBiomarkers[key]; // last wins automatically
-}
-    // -----------------------------
-    // STEP 2: Unit Normalization
-    // -----------------------------
+    // STEP 2: Dedup (canonical)
+    const dedupedBiomarkers = {};
+    for (const key in mappedBiomarkers) {
+      dedupedBiomarkers[key] = mappedBiomarkers[key];
+    }
+
+    // STEP 3: Normalize units
     const normalizedBiomarkers = normalizeUnits(dedupedBiomarkers);
 
-    // -----------------------------
-    // STEP 3: Flatten Values
-    // -----------------------------
+    // STEP 4: Flatten
     const flattenedBiomarkers = {};
-
     for (const key in normalizedBiomarkers) {
       flattenedBiomarkers[key] = normalizedBiomarkers[key].value;
     }
@@ -70,9 +67,7 @@ for (const key in mappedBiomarkers) {
     console.log("NORMALIZED:", normalizedBiomarkers);
     console.log("FLATTENED:", flattenedBiomarkers);
 
-    // -----------------------------
-    // STEP 4: Minimum Biomarker Check
-    // -----------------------------
+    // STEP 5: Minimum check
     const biomarkerCount = Object.keys(flattenedBiomarkers).length;
 
     if (biomarkerCount < 2) {
@@ -82,19 +77,20 @@ for (const key in mappedBiomarkers) {
       });
     }
 
-    // -----------------------------
-    // STEP 5: Core Algorithm
-    // -----------------------------
+    // STEP 6: Core calculations
     const zScores = calculateZScores(flattenedBiomarkers, reference);
 
     const severity = applyDirectionality(zScores, reference);
+
+    // 🔥 THIS WAS MISSING
+    const insights = generateInsights(severity, reference);
 
     const domainScores = calculateDomainScores(severity, reference);
 
     const compositeScore = calculateCompositeScore(domainScores, domainWeights);
 
-    // 🔥 NEW ADDITIONS
     const domainContributions = calculateDomainContributions(domainScores, domainWeights);
+
     const riskScore = calculateRiskScore(compositeScore);
 
     const ageResult = calculateBiologicalAge(compositeScore, age);
@@ -120,9 +116,10 @@ for (const key in mappedBiomarkers) {
         zScores,
         severity,
         domainScores,
-        domainContributions,   // ✅ NEW
+        domainContributions,
         compositeScore,
-        riskScore,             // ✅ NEW
+        riskScore,
+        insights, // 🔥 NOW INCLUDED
         deltaAge: ageResult.deltaAge,
         biologicalAge: ageResult.biologicalAge,
         confidence
