@@ -6,6 +6,8 @@ const aliasMap = {
 
   LDL: ["ldl", "ldlcholesterol"],
   HDL: ["hdl", "hdlcholesterol"],
+  FastingGlucose: ["glucose", "fastingglucose", "fasting sugar"],
+Creatinine: ["creatinine", "serumcreatinine"],
 
 };
 
