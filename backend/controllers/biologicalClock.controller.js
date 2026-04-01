@@ -123,11 +123,11 @@ const calculateBiologicalAgeController = (req, res) => {
         deltaAge: ageResult.deltaAge,
         biologicalAge: ageResult.biologicalAge,
         confidence
-      },
-      debug: {
-        normalizedBiomarkers,
-        flattenedBiomarkers
       }
+      // debug: {
+      //   normalizedBiomarkers,
+      //   flattenedBiomarkers
+      // }
     });
 
   } catch (error) {
