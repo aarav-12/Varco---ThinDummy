@@ -1,5 +1,12 @@
 // services/insightEngine.js
 
+function getSeverityLabel(value) {
+  if (value > 2) return "HIGH";
+  if (value > 1) return "MODERATE";
+  if (value > 0.5) return "MILD";
+  return null;
+}
+
 function generateInsights(severity, reference) {
 
   const insights = [];
@@ -11,45 +18,49 @@ function generateInsights(severity, reference) {
 
     if (!meta) continue;
 
-    // 🔥 Only flag meaningful deviations
-    if (value < 0.5) continue;
+    // Ignore insignificant values
+    const level = getSeverityLabel(value);
+    if (!level) continue;
 
     
     // Custom Rules (high signal)
     
 
-    if (key === "LDL" && value >= 1) {
-      insights.push("High LDL → increased cardiovascular risk");
+    if (key === "LDL") {
+      insights.push(`${level} LDL → cardiovascular risk`);
     }
 
-    else if (key === "HDL" && value >= 1) {
-      insights.push("Low HDL → reduced heart protection");
+    else if (key === "HDL") {
+      insights.push(`${level} HDL → reduced heart protection`);
     }
 
-    else if (key === "FastingGlucose" && value >= 0.5) {
-      insights.push("Elevated glucose → risk of insulin resistance");
+    else if (key === "FastingGlucose") {
+      insights.push(`${level} glucose → insulin resistance risk`);
     }
 
-    else if (key === "Creatinine" && value >= 0.5) {
-      insights.push("Elevated creatinine → possible kidney stress");
+    else if (key === "Creatinine") {
+      insights.push(`${level} creatinine → kidney stress possible`);
     }
 
-    else if (key === "CRP" && value >= 0.5) {
-      insights.push("Elevated CRP → inflammation detected");
+    else if (key === "CRP") {
+      insights.push(`${level} CRP → inflammation detected`);
     }
 
-    else if (key === "VitaminD" && value >= 1) {
-      insights.push("Low Vitamin D → hormonal / bone health risk");
+    else if (key === "VitaminD") {
+      insights.push(`${level} Vitamin D → hormonal / bone risk`);
     }
 
     
-    // Generic fallback
+    // Domain-aware fallback (better than generic)
     
     else {
-      insights.push(`${key} is outside optimal range`);
+      insights.push(`${level} ${key} → ${meta.domain} imbalance`);
     }
   }
-
+insights.sort((a, b) => {
+  const order = { HIGH: 3, MODERATE: 2, MILD: 1 };
+  return order[b.split(" ")[0]] - order[a.split(" ")[0]];
+});
   return insights;
 }
 

@@ -119,7 +119,7 @@ const calculateBiologicalAgeController = (req, res) => {
         domainContributions,
         compositeScore,
         riskScore,
-        insights, // 🔥 NOW INCLUDED
+        insights, 
         deltaAge: ageResult.deltaAge,
         biologicalAge: ageResult.biologicalAge,
         confidence

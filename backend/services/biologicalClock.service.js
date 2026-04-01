@@ -166,14 +166,24 @@ function calculateBiologicalAge(compositeScore, chronologicalAge, k = 6) {
 
 // CONFIDENCE SCORE
 
-function calculateConfidence(patientBiomarkers, referenceData) {
+function calculateConfidence(flattened, reference) {
+  const total = Object.keys(reference).length;
+  const present = Object.keys(flattened).length;
 
-  const expected = Object.keys(referenceData).length;
-  const received = Object.keys(patientBiomarkers).length;
+  // base coverage
+  let score = present / total;
 
-  const confidence = received / expected;
+  // 🔥 bonus for domain coverage
+  const domains = new Set();
+  for (const key in flattened) {
+    if (reference[key]) {
+      domains.add(reference[key].domain);
+    }
+  }
 
-  return Number(confidence.toFixed(2));
+  score += domains.size * 0.05;
+
+  return Math.min(1, Number(score.toFixed(2)));
 }
 
 
