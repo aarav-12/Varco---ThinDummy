@@ -15,7 +15,7 @@ const { mapBiomarkers } = require("../utils/biomarkerMapper");
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
 
-
+const { adaptBiomarkerInput } = require("../utils/biomarkerInputAdapter");
 // -----------------------------------------
 // BIOLOGICAL AGE CONTROLLER
 // -----------------------------------------
@@ -35,7 +35,10 @@ const calculateBiologicalAgeController = (req, res) => {
       });
     }
 
-    const { biomarkers, age } = req.body;
+   const { biomarkers: rawBiomarkers, age } = req.body;
+
+// 🔥 NEW: adapt AI or manual input
+const biomarkers = adaptBiomarkerInput(rawBiomarkers);
     const reference = biomarkerReference;
 
     console.log("REFERENCE KEYS:", Object.keys(reference));
@@ -44,11 +47,16 @@ const calculateBiologicalAgeController = (req, res) => {
     // STEP 1: Alias Mapping
     // -----------------------------
     const mappedBiomarkers = mapBiomarkers(biomarkers);
+//techncally this is deduplicate after mapping
+    const dedupedBiomarkers = {};
 
+for (const key in mappedBiomarkers) {
+  dedupedBiomarkers[key] = mappedBiomarkers[key]; // last wins automatically
+}
     // -----------------------------
     // STEP 2: Unit Normalization
     // -----------------------------
-    const normalizedBiomarkers = normalizeUnits(mappedBiomarkers);
+    const normalizedBiomarkers = normalizeUnits(dedupedBiomarkers);
 
     // -----------------------------
     // STEP 3: Flatten Values

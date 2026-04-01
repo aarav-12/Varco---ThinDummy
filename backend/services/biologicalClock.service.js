@@ -244,7 +244,8 @@ module.exports = {
   calculateConfidence,
   runBiologicalClock,
   calculateRiskScore,
-  calculateClockAngle
+  calculateClockAngle,
+  calculateDomainContributions
 
 
 };
