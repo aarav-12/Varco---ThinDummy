@@ -22,7 +22,7 @@ app.use("/api/doctor", doctorRoutes);
 
 
 app.use("/api/calendar", calendarRoutes);
-
+app.use("/api/biological-age", biologicalClockRoutes);
 /* LOGGER */
 app.use((req, res, next) => {
   console.log("➡ Incoming request:", req.method, req.originalUrl);

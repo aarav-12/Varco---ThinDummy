@@ -4,8 +4,13 @@ const {
   calculateDomainScores,
   calculateCompositeScore,
   calculateBiologicalAge,
-  calculateConfidence
+  calculateConfidence,
+  calculateDomainContributions,
+  calculateRiskScore
 } = require("../services/biologicalClock.service");
+
+const { normalizeUnits } = require("../services/biomarkerSanitizer");
+const { mapBiomarkers } = require("../utils/biomarkerMapper");
 
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
@@ -19,10 +24,11 @@ const calculateBiologicalAgeController = (req, res) => {
 
   try {
 
+    console.log("🔥 CONTROLLER HIT");
+
     // -----------------------------
     // Input Validation
     // -----------------------------
-
     if (!req.body || !req.body.biomarkers || !req.body.age) {
       return res.status(400).json({
         error: "Missing biomarkers or age in request body"
@@ -30,15 +36,48 @@ const calculateBiologicalAgeController = (req, res) => {
     }
 
     const { biomarkers, age } = req.body;
-
     const reference = biomarkerReference;
 
+    console.log("REFERENCE KEYS:", Object.keys(reference));
 
     // -----------------------------
-    // ALGORITHM PIPELINE
+    // STEP 1: Alias Mapping
     // -----------------------------
+    const mappedBiomarkers = mapBiomarkers(biomarkers);
 
-    const zScores = calculateZScores(biomarkers, reference);
+    // -----------------------------
+    // STEP 2: Unit Normalization
+    // -----------------------------
+    const normalizedBiomarkers = normalizeUnits(mappedBiomarkers);
+
+    // -----------------------------
+    // STEP 3: Flatten Values
+    // -----------------------------
+    const flattenedBiomarkers = {};
+
+    for (const key in normalizedBiomarkers) {
+      flattenedBiomarkers[key] = normalizedBiomarkers[key].value;
+    }
+
+    console.log("NORMALIZED:", normalizedBiomarkers);
+    console.log("FLATTENED:", flattenedBiomarkers);
+
+    // -----------------------------
+    // STEP 4: Minimum Biomarker Check
+    // -----------------------------
+    const biomarkerCount = Object.keys(flattenedBiomarkers).length;
+
+    if (biomarkerCount < 2) {
+      return res.status(400).json({
+        error: "Not enough biomarkers to calculate biological age",
+        message: "Minimum 2 biomarkers required"
+      });
+    }
+
+    // -----------------------------
+    // STEP 5: Core Algorithm
+    // -----------------------------
+    const zScores = calculateZScores(flattenedBiomarkers, reference);
 
     const severity = applyDirectionality(zScores, reference);
 
@@ -46,43 +85,44 @@ const calculateBiologicalAgeController = (req, res) => {
 
     const compositeScore = calculateCompositeScore(domainScores, domainWeights);
 
+    // 🔥 NEW ADDITIONS
+    const domainContributions = calculateDomainContributions(domainScores, domainWeights);
+    const riskScore = calculateRiskScore(compositeScore);
+
     const ageResult = calculateBiologicalAge(compositeScore, age);
 
-    const confidence = calculateConfidence(biomarkers, reference);
+    const confidence = calculateConfidence(flattenedBiomarkers, reference);
 
+    console.log("Z SCORES:", zScores);
+    console.log("SEVERITY:", severity);
+    console.log("DOMAIN SCORES:", domainScores);
+    console.log("COMPOSITE SCORE:", compositeScore);
+    console.log("DOMAIN CONTRIBUTIONS:", domainContributions);
+    console.log("RISK SCORE:", riskScore);
 
     // -----------------------------
     // RESPONSE
     // -----------------------------
-console.log("Z SCORES:", zScores);
-console.log("SEVERITY:", severity);
-console.log("DOMAIN SCORES:", domainScores);
-console.log("COMPOSITE SCORE:", compositeScore);
     res.json({
-
       input: {
         age,
         biomarkers
       },
-
       results: {
-
         zScores,
-
         severity,
-
         domainScores,
-
+        domainContributions,   // ✅ NEW
         compositeScore,
-
+        riskScore,             // ✅ NEW
         deltaAge: ageResult.deltaAge,
-
         biologicalAge: ageResult.biologicalAge,
-
         confidence
-
+      },
+      debug: {
+        normalizedBiomarkers,
+        flattenedBiomarkers
       }
-
     });
 
   } catch (error) {
@@ -97,11 +137,6 @@ console.log("COMPOSITE SCORE:", compositeScore);
   }
 
 };
-
-
-// -----------------------------------------
-// EXPORT
-// -----------------------------------------
 
 module.exports = {
   calculateBiologicalAgeController
