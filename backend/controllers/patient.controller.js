@@ -6,9 +6,9 @@ const { runAlgorithm } = require("../services/algorithm.service");
 const { generateExplanation } = require("../services/ai.service");
 
 
-// -----------------------------
+
 // CREATE PATIENT
-// -----------------------------
+
 exports.submitPatient = async (req, res) => {
   try {
     console.log("📥 Incoming request body:", req.body);
@@ -86,9 +86,9 @@ exports.submitPatient = async (req, res) => {
 
 
 
-// -----------------------------
+
 // GET ALL PATIENTS
-// -----------------------------
+
 exports.getAllPatients = async (req, res) => {
   try {
     const result = await pool.query(
@@ -112,9 +112,9 @@ exports.getAllPatients = async (req, res) => {
 
 
 
-// -----------------------------
+
 // GET SINGLE PATIENT
-// -----------------------------
+
 exports.getPatientById = async (req, res) => {
   try {
     const { id } = req.params;
