@@ -14,13 +14,15 @@ const { mapBiomarkers } = require("../utils/biomarkerMapper");
 const { adaptBiomarkerInput } = require("../utils/biomarkerInputAdapter");
 const { generateInsights } = require("../services/insightEngine");
 
+const { generateAllRecommendations } = require("../services/recommendationEngine.service");
+
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
 
 const pool = require("../db");
 
-// BIOLOGICAL AGE CONTROLLER
 
+// BIOLOGICAL AGE CONTROLLER
 
 const calculateBiologicalAgeController = async (req, res) => {
 
@@ -28,13 +30,13 @@ const calculateBiologicalAgeController = async (req, res) => {
 
     console.log("🔥 CONTROLLER HIT");
 
-    if (!req.body || !req.body.biomarkers || !req.body.age) {
+    if (!req.body || !req.body.biomarkers || !req.body.age || !req.body.patientId) {
       return res.status(400).json({
-        error: "Missing biomarkers or age in request body"
+        error: "Missing biomarkers, age, or patientId"
       });
     }
 
-    const { biomarkers: rawBiomarkers, age } = req.body;
+    const { biomarkers: rawBiomarkers, age, patientId } = req.body;
 
     const biomarkers = adaptBiomarkerInput(rawBiomarkers);
     const reference = biomarkerReference;
@@ -63,8 +65,10 @@ const calculateBiologicalAgeController = async (req, res) => {
     }
 
     
+    // =========================
     // CORE ENGINE
-    
+    // =========================
+
     const zScores = calculateZScores(flattenedBiomarkers, reference);
     const severity = applyDirectionality(zScores, reference);
     const insights = generateInsights(severity, reference);
@@ -91,14 +95,36 @@ const calculateBiologicalAgeController = async (req, res) => {
     };
 
    
-    // SAVE TO DB (SAFE)
-   
+    // =========================
+    // AUTO GENERATE RECOMMENDATIONS
+    // =========================
+
+    const recommendations = generateAllRecommendations(domainScores);
+
+    try {
+      for (const rec of recommendations) {
+        await pool.query(
+          `INSERT INTO patient_recommendations (patient_id, domain, recommendation)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (patient_id, domain) DO NOTHING`,
+          [patientId, rec.domain, rec.recommendation]
+        );
+      }
+    } catch (recError) {
+      console.error("RECOMMENDATION SAVE FAILED:", recError.message);
+    }
+
+
+    // =========================
+    // SAVE REPORT
+    // =========================
+
     try {
       await pool.query(
         `INSERT INTO reports (user_id, age, biomarkers, results)
          VALUES ($1, $2, $3, $4)`,
         [
-          "demo-user",
+          patientId,
           age,
           JSON.stringify(normalizedBiomarkers),
           JSON.stringify(resultsPayload)
@@ -106,18 +132,20 @@ const calculateBiologicalAgeController = async (req, res) => {
       );
     } catch (dbError) {
       console.error("DB SAVE FAILED:", dbError.message);
-      // Don't crash API if DB fails
     }
 
     
+    // =========================
     // RESPONSE
-    
+    // =========================
+
     res.json({
       input: {
         age,
         biomarkers
       },
-      results: resultsPayload
+      results: resultsPayload,
+      recommendations //  optional but useful for frontend
     });
 
   } catch (error) {

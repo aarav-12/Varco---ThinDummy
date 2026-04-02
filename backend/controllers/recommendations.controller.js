@@ -1,17 +1,19 @@
 const pool = require("../db");
 
-// ----------------------------------
-// GET RECOMMENDATIONS
-// ----------------------------------
 
+// -----------------------------
+// GET RECOMMENDATIONS
+// -----------------------------
 const getRecommendations = async (req, res) => {
   try {
-    let { patientId } = req.params;
+    const { patientId } = req.params;
 
-    // ✅ Convert to integer (CRITICAL FIX)
-    patientId = parseInt(patientId);
+    console.log("PATIENT ID RECEIVED:", patientId);
 
-    if (isNaN(patientId)) {
+    // ✅ UUID validation (correct way)
+    const uuidRegex = /^[0-9a-fA-F-]{36}$/;
+
+    if (!patientId || !uuidRegex.test(patientId)) {
       return res.status(400).json({
         error: "Invalid patientId"
       });
@@ -38,19 +40,21 @@ const getRecommendations = async (req, res) => {
 };
 
 
-// ----------------------------------
-// UPSERT RECOMMENDATION
-// ----------------------------------
 
+// -----------------------------
+// UPSERT RECOMMENDATION
+// -----------------------------
 const upsertRecommendation = async (req, res) => {
   try {
-    let { patientId } = req.params;
+    const { patientId } = req.params;
     const { domain, recommendation } = req.body;
 
-    // ✅ Convert to integer
-    patientId = parseInt(patientId);
+    console.log("UPSERT FOR:", patientId);
 
-    if (isNaN(patientId)) {
+    // ✅ UUID validation
+    const uuidRegex = /^[0-9a-fA-F-]{36}$/;
+
+    if (!patientId || !uuidRegex.test(patientId)) {
       return res.status(400).json({
         error: "Invalid patientId"
       });
