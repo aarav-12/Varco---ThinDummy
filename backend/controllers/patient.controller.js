@@ -49,6 +49,20 @@ exports.submitPatient = async (req, res) => {
       throw new Error("Algorithm returned undefined");
     }
 
+    // 🔥 SANITIZE VALUES (THIS IS THE FIX)
+    const safeBiologicalAge = Number.isFinite(algoResult.biologicalAge)
+      ? algoResult.biologicalAge
+      : null;
+
+    const safeDeviation = Number.isFinite(algoResult.deviation)
+      ? algoResult.deviation
+      : null;
+
+    console.log("🧪 SANITIZED:", {
+      safeBiologicalAge,
+      safeDeviation
+    });
+
     // ================= AI =================
     let aiSummary = null;
 
@@ -56,15 +70,13 @@ exports.submitPatient = async (req, res) => {
       console.log("🤖 STEP 3: Calling AI...");
 
       aiSummary = await generateExplanation({
-        deviation: algoResult.deviation,
+        deviation: safeDeviation,
         severity: algoResult.biomarkerSeverity
       });
 
       console.log("✅ STEP 3 DONE: AI response received");
     } catch (aiError) {
       console.error("⚠️ AI FAILED:", aiError.message);
-
-      // fallback so system doesn't crash
       aiSummary = "AI summary unavailable";
     }
 
@@ -83,7 +95,7 @@ exports.submitPatient = async (req, res) => {
         rawInputs,
         algoResult.biomarkers,
         algoResult.biomarkerSeverity,
-        algoResult.biologicalAge,
+        safeBiologicalAge, // ✅ FIXED
         age || null,
         aiSummary
       ]
@@ -94,15 +106,15 @@ exports.submitPatient = async (req, res) => {
     return res.status(201).json({
       message: "Patient submitted successfully",
       patientId: result.rows[0].id,
-      biologicalAge: result.rows[0].biological_age,
-      deviation: algoResult.deviation,
+      biologicalAge: safeBiologicalAge,
+      deviation: safeDeviation,
       biomarkers: algoResult.biomarkers,
       severity: algoResult.biomarkerSeverity,
       aiSummary
     });
 
   } catch (error) {
-    console.error("🔥 FULL ERROR:", error); // FULL STACK TRACE
+    console.error("🔥 FULL ERROR:", error);
 
     return res.status(500).json({
       error: error.message || "Submission failed"
