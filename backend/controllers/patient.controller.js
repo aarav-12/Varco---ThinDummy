@@ -5,6 +5,10 @@ const pool = require("../db");
 const { runAlgorithm } = require("../services/algorithm.service");
 const { generateExplanation } = require("../services/ai.service");
 
+
+// -----------------------------
+// CREATE PATIENT
+// -----------------------------
 exports.submitPatient = async (req, res) => {
   try {
     console.log("📥 Incoming request body:", req.body);
@@ -19,14 +23,12 @@ exports.submitPatient = async (req, res) => {
       hasSwelling
     } = req.body;
 
-    // ✅ Basic validation
     if (!name || painLevel === undefined) {
       return res.status(400).json({
         error: "Name and painLevel are required"
       });
     }
 
-    // ✅ Build rawInputs object (source of truth)
     const rawInputs = {
       painLevel,
       symptoms: symptoms || null,
@@ -34,19 +36,15 @@ exports.submitPatient = async (req, res) => {
       hasSwelling: hasSwelling ?? null
     };
 
-    // ✅ Run algorithm service
     const algoResult = runAlgorithm(rawInputs, age);
 
     console.log("🧠 Algorithm output:", algoResult);
 
-    // ✅ Generate AI explanation (based on severity or deviation)
-   const aiSummary = await generateExplanation({
-  deviation: algoResult.deviation,
-  severity: algoResult.biomarkerSeverity
-});
+    const aiSummary = await generateExplanation({
+      deviation: algoResult.deviation,
+      severity: algoResult.biomarkerSeverity
+    });
 
-
-    // ✅ Insert structured data into DB
     const result = await pool.query(
       `INSERT INTO patients 
       (name, age, gender, raw_inputs, biomarkers, risk_scores, biological_age, chronological_age, ai_summary)
@@ -82,6 +80,78 @@ exports.submitPatient = async (req, res) => {
 
     return res.status(500).json({
       error: "Submission failed"
+    });
+  }
+};
+
+
+
+// -----------------------------
+// GET ALL PATIENTS
+// -----------------------------
+exports.getAllPatients = async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, age, gender, created_at
+       FROM patients
+       ORDER BY created_at DESC`
+    );
+
+    return res.json({
+      success: true,
+      patients: result.rows
+    });
+
+  } catch (error) {
+    console.error("GET ALL PATIENTS ERROR:", error);
+    return res.status(500).json({
+      error: "Failed to fetch patients"
+    });
+  }
+};
+
+
+
+// -----------------------------
+// GET SINGLE PATIENT
+// -----------------------------
+exports.getPatientById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log("PATIENT FETCH:", id);
+
+    // ✅ UUID validation
+    const uuidRegex = /^[0-9a-fA-F-]{36}$/;
+
+    if (!id || !uuidRegex.test(id)) {
+      return res.status(400).json({
+        error: "Invalid patient ID"
+      });
+    }
+
+    const result = await pool.query(
+      `SELECT *
+       FROM patients
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        error: "Patient not found"
+      });
+    }
+
+    return res.json({
+      success: true,
+      patient: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error("GET PATIENT ERROR:", error);
+    return res.status(500).json({
+      error: "Failed to fetch patient"
     });
   }
 };
