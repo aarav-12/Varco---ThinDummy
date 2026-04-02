@@ -15,7 +15,7 @@ app.use(express.json());
 // ROUTE MOUNTING
 app.use("/api/biological-age", biologicalClockRoutes);
 app.use("/api/reports", reportRoutes); // ✅ CLEAN
-
+app.use("/api/admin", require("./routes/admin.routes"));
 // DEBUG: list all endpoints
 console.log(listEndpoints(app));
 
