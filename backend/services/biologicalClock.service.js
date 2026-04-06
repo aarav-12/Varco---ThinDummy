@@ -1,11 +1,8 @@
-
 // Z SCORE CALCULATION
 
 function calculateZScore(value, mean, sd) {
-
   let z = (value - mean) / sd;
 
-  // Outlier cap (±3 SD)
   if (z > 3) z = 3;
   if (z < -3) z = -3;
 
@@ -13,33 +10,26 @@ function calculateZScore(value, mean, sd) {
 }
 
 function calculateZScores(patientBiomarkers, referenceData) {
-
   const zScores = {};
 
   for (const biomarker in patientBiomarkers) {
-
     const value = patientBiomarkers[biomarker];
     const ref = referenceData[biomarker];
 
     if (!ref) continue;
 
-    const z = calculateZScore(value, ref.mean, ref.sd);
-
-    zScores[biomarker] = z;
+    zScores[biomarker] = calculateZScore(value, ref.mean, ref.sd);
   }
 
   return zScores;
 }
 
-
-// DIRECTIONALITY ADJUSTMENT
+// DIRECTIONALITY
 
 function applyDirectionality(zScores, referenceData) {
-
   const severity = {};
 
   for (const biomarker in zScores) {
-
     const ref = referenceData[biomarker];
     if (!ref) continue;
 
@@ -55,21 +45,14 @@ function applyDirectionality(zScores, referenceData) {
   return severity;
 }
 
-
-// DOMAIN SCORE CALCULATION
+// DOMAIN SCORES (FIXED)
 
 function calculateDomainScores(severityScores, referenceData) {
-
   const domainBuckets = {};
 
   for (const biomarker in severityScores) {
-
     const ref = referenceData[biomarker];
-
-    if (!ref) {
-      console.warn(`Unknown biomarker: ${biomarker}`);
-      continue;
-    }
+    if (!ref) continue;
 
     const domain = ref.domain;
 
@@ -83,22 +66,24 @@ function calculateDomainScores(severityScores, referenceData) {
   const domainScores = {};
 
   for (const domain in domainBuckets) {
-
     const values = domainBuckets[domain];
 
-    const rms =
-  Math.sqrt(
-    values.reduce((sum, v) => sum + v * v, 0) / values.length
-  );
+    const rms = Math.sqrt(
+      values.reduce((sum, v) => sum + v * v, 0) / values.length
+    );
 
-    domainScores[domain] = rms;
+    // ✅ LOW SAMPLE PENALTY
+    const adjusted = rms * Math.sqrt(values.length / 3);
+
+    domainScores[domain] = Number(adjusted.toFixed(4));
   }
 
   return domainScores;
 }
 
-function calculateDomainContributions(domainScores, domainWeights, k = 6) {
+// DOMAIN CONTRIBUTIONS
 
+function calculateDomainContributions(domainScores, domainWeights, k = 6) {
   const contributions = {};
   let weightSum = 0;
 
@@ -115,39 +100,35 @@ function calculateDomainContributions(domainScores, domainWeights, k = 6) {
   return contributions;
 }
 
-// COMPOSITE SEVERITY SCORE
+// COMPOSITE SCORE (WITH COVERAGE FIX)
 
 function calculateCompositeScore(domainScores, domainWeights) {
-
   let weightSum = 0;
 
   for (const domain in domainScores) {
     weightSum += domainWeights[domain] || 0;
   }
 
-  // Safety check
   if (weightSum === 0) return 0;
 
   let compositeScore = 0;
 
   for (const domain in domainScores) {
-
     const score = domainScores[domain];
-    const originalWeight = domainWeights[domain] || 0;
-
-    const normalizedWeight = originalWeight / weightSum;
+    const normalizedWeight = (domainWeights[domain] || 0) / weightSum;
 
     compositeScore += score * normalizedWeight;
   }
 
-  return compositeScore;
+  // ✅ COVERAGE DAMPING
+  const coverageFactor = Math.min(1, Object.keys(domainScores).length / 5);
+
+  return compositeScore * coverageFactor;
 }
 
-
-// BIOLOGICAL AGE CALCULATION
+// BIOLOGICAL AGE (FINAL — NO CONFIDENCE HERE)
 
 function calculateBiologicalAge(compositeScore, chronologicalAge, k = 6) {
-
   const rawDeltaAge = compositeScore * k;
 
   const dampingFactor = 25;
@@ -163,17 +144,14 @@ function calculateBiologicalAge(compositeScore, chronologicalAge, k = 6) {
   };
 }
 
-
-// CONFIDENCE SCORE
+// CONFIDENCE (ONLY FOR UI)
 
 function calculateConfidence(flattened, reference) {
   const total = Object.keys(reference).length;
   const present = Object.keys(flattened).length;
 
-  // base coverage
   let score = present / total;
 
-  // 🔥 bonus for domain coverage
   const domains = new Set();
   for (const key in flattened) {
     if (reference[key]) {
@@ -186,11 +164,9 @@ function calculateConfidence(flattened, reference) {
   return Math.min(1, Number(score.toFixed(2)));
 }
 
-
-// MASTER BIOLOGICAL CLOCK FUNCTION
+// MASTER FUNCTION (FIXED ORDER)
 
 function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights) {
-
   const zScores = calculateZScores(patientBiomarkers, referenceData);
 
   const severity = applyDirectionality(zScores, referenceData);
@@ -204,28 +180,20 @@ function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights
   const confidence = calculateConfidence(patientBiomarkers, referenceData);
 
   return {
-
     biomarkers: patientBiomarkers,
-
     zScores,
-
     severity,
-
     domainScores,
-
     compositeScore,
-
     deltaAge: ageResults.deltaAge,
-
     biologicalAge: ageResults.biologicalAge,
-
     confidence
-
   };
 }
 
-function calculateRiskScore(compositeScore) {
+// RISK SCORE
 
+function calculateRiskScore(compositeScore) {
   let riskScore = compositeScore * 2.5;
 
   if (riskScore > 10) riskScore = 10;
@@ -233,18 +201,10 @@ function calculateRiskScore(compositeScore) {
 
   return Number(riskScore.toFixed(2));
 }
-function calculateClockAngle(riskScore) {
-
-  const angle = (riskScore / 10) * 180 - 90;
-
-  return Number(angle.toFixed(2));
-}
 
 // EXPORTS
 
-
 module.exports = {
-
   calculateZScore,
   calculateZScores,
   applyDirectionality,
@@ -254,8 +214,5 @@ module.exports = {
   calculateConfidence,
   runBiologicalClock,
   calculateRiskScore,
-  calculateClockAngle,
   calculateDomainContributions
-
-
 };

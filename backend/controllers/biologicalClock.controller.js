@@ -4,52 +4,55 @@ const {
   calculateDomainScores,
   calculateCompositeScore,
   calculateBiologicalAge,
-  calculateConfidence,
-  calculateDomainContributions,
-  calculateRiskScore
+  calculateConfidence
 } = require("../services/biologicalClock.service");
 
 const { normalizeUnits } = require("../services/biomarkerSanitizer");
 const { mapBiomarkers } = require("../utils/biomarkerMapper");
 const { adaptBiomarkerInput } = require("../utils/biomarkerInputAdapter");
-const { generateInsights } = require("../services/insightEngine");
-const { generateAllRecommendations } = require("../services/recommendationEngine.service");
+const { applyUnitConversion } = require("../utils/unitConversion");
 
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
-
-const { callLLM } = require("../services/llm.service"); // 🔥 AI
-
 const pool = require("../db");
 
 
-// AI CONTEXT BUILDER
-const buildMedicalContext = (data) => {
-  return `
-Patient Summary:
+// 🔥 STEP 2 — TOP INSIGHTS FUNCTION
+function getTopInsights(domainScores) {
 
-- Age: ${data.age}
-- Biological Age: ${data.biologicalAge}
-- Deviation: ${data.deltaAge}
+  const entries = Object.entries(domainScores);
 
-Domain Scores:
-${JSON.stringify(data.domainScores, null, 2)}
+  entries.sort((a, b) => b[1] - a[1]);
 
-Biomarkers:
-${JSON.stringify(data.biomarkers, null, 2)}
+  const top = entries.slice(0, 2);
 
-Instructions:
-- Be concise and structured
-- Use bullet points
-- Focus only on THIS patient's data
-- Highlight abnormal values
-- Give 3 actionable steps
-- Do NOT diagnose
-`;
-};
+  return top.map(([domain, score]) => {
 
+    let impact = "Low";
+    if (score > 0.8) impact = "High";
+    else if (score > 0.5) impact = "Moderate";
 
-// CONTROLLER
+    let message = "";
+
+    if (domain === "endocrine") {
+      message = "Blood sugar and metabolic health are your biggest aging drivers";
+    } else if (domain === "inflammation") {
+      message = "Chronic inflammation is contributing to accelerated aging";
+    } else if (domain === "muscle") {
+      message = "Muscle health and recovery may be impacting your aging";
+    } else {
+      message = `${domain} health is contributing to your biological age`;
+    }
+
+    return {
+      domain,
+      score: Number(score.toFixed(2)),
+      impact,
+      message
+    };
+  });
+}
+
 
 const calculateBiologicalAgeController = async (req, res) => {
   try {
@@ -63,152 +66,112 @@ const calculateBiologicalAgeController = async (req, res) => {
 
     const { biomarkers: rawBiomarkers, age, patientId } = req.body;
 
+    // STEP 1 — ADAPT
     const biomarkers = adaptBiomarkerInput(rawBiomarkers);
-    const reference = biomarkerReference;
 
-    const mappedBiomarkers = mapBiomarkers(biomarkers);
+    // STEP 2 — MAP
+    const { mapped: mappedBiomarkers, rejected: mappingRejected } = mapBiomarkers(biomarkers);
 
-    const dedupedBiomarkers = {};
-    for (const key in mappedBiomarkers) {
-      dedupedBiomarkers[key] = mappedBiomarkers[key];
-    }
+    // STEP 3 — NORMALIZE
+    const normalizedBiomarkers = normalizeUnits(mappedBiomarkers);
 
-    const normalizedBiomarkers = normalizeUnits(dedupedBiomarkers);
+    // STEP 4 — UNIT CONVERSION
+    const {
+      converted: unitSafeBiomarkers,
+      conversionLog,
+      rejected: unitRejected
+    } = applyUnitConversion(normalizedBiomarkers, biomarkerReference);
 
+    // STEP 5 — FLATTEN
     const flattenedBiomarkers = {};
-    for (const key in normalizedBiomarkers) {
-      flattenedBiomarkers[key] = normalizedBiomarkers[key].value;
+    for (const key in unitSafeBiomarkers) {
+      flattenedBiomarkers[key] = unitSafeBiomarkers[key].value;
     }
 
-    const biomarkerCount = Object.keys(flattenedBiomarkers).length;
-
-    if (biomarkerCount < 2) {
+    if (Object.keys(flattenedBiomarkers).length < 2) {
       return res.status(400).json({
         error: "Not enough biomarkers",
         message: "Minimum 2 biomarkers required"
       });
     }
 
-  
-    // CORE ENGINE
-  
+    // STEP 6 — CORE ENGINE
+    const zScores = calculateZScores(flattenedBiomarkers, biomarkerReference);
+    const severity = applyDirectionality(zScores, biomarkerReference);
+    const domainScores = calculateDomainScores(severity, biomarkerReference);
 
-    const zScores = calculateZScores(flattenedBiomarkers, reference);
-    const severity = applyDirectionality(zScores, reference);
-    const insights = generateInsights(severity, reference);
-
-    const domainScores = calculateDomainScores(severity, reference);
     const compositeScore = calculateCompositeScore(domainScores, domainWeights);
-    const domainContributions = calculateDomainContributions(domainScores, domainWeights);
-    const riskScore = calculateRiskScore(compositeScore);
-
     const ageResult = calculateBiologicalAge(compositeScore, age);
-    const confidence = calculateConfidence(flattenedBiomarkers, reference);
+    const confidence = calculateConfidence(flattenedBiomarkers, biomarkerReference);
 
-    const resultsPayload = {
-      zScores,
-      severity,
-      domainScores,
-      domainContributions,
-      compositeScore,
-      riskScore,
-      insights,
-      deltaAge: ageResult.deltaAge,
+    // STEP 7 — TRACEABILITY
+    const rejected = [
+      ...(mappingRejected || []),
+      ...(unitRejected || [])
+    ];
+
+    // STEP 8 — TRUST LAYER
+    const dataPoints = Object.keys(flattenedBiomarkers).length;
+
+    const confidenceLabel =
+      confidence > 0.75 ? "High" :
+      confidence > 0.5 ? "Moderate" :
+      "Low";
+
+    const note =
+      dataPoints < 5
+        ? "Add more biomarkers for higher accuracy"
+        : "Sufficient data for a reliable estimate";
+
+    // STEP 9 — INSIGHTS
+    const topIssues = getTopInsights(domainScores);
+
+    // ✅ FINAL RESPONSE
+    res.json({
       biologicalAge: ageResult.biologicalAge,
-      confidence
-    };
+      deltaAge: ageResult.deltaAge,
 
-  
-    // AI SUMMARY
-  
+      matched: Object.keys(flattenedBiomarkers),
+      converted: conversionLog,
+      rejected,
 
-    let aiSummary = null;
+      domainScores,
+      confidence,
 
-    try {
-      const context = buildMedicalContext({
-        age,
-        biologicalAge: ageResult.biologicalAge,
-        deltaAge: ageResult.deltaAge,
-        domainScores,
-        biomarkers: flattenedBiomarkers
-      });
+      confidenceLabel,
+      dataPoints,
+      note,
 
-      const messages = [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: context + "\n\nGive summary, risks, and recommendations."
-            }
-          ]
-        }
-      ];
+      topIssues,
 
-      aiSummary = await callLLM(messages);
+      algorithmVersion: "2.0"
+    });
 
-    } catch (aiError) {
-      console.error("AI SUMMARY FAILED:", aiError.message);
-      aiSummary = "AI summary unavailable";
-    }
-
-  
-    // RECOMMENDATIONS
-  
-
-    const recommendations = generateAllRecommendations(domainScores);
-
-    try {
-      for (const rec of recommendations) {
-        await pool.query(
-          `INSERT INTO patient_recommendations (patient_id, domain, recommendation)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (patient_id, domain) DO NOTHING`,
-          [patientId, rec.domain, rec.recommendation]
-        );
-      }
-    } catch (recError) {
-      console.error("RECOMMENDATION SAVE FAILED:", recError.message);
-    }
-
-  
-    // SAVE REPORT
-  
-
+    // ✅ NON-BLOCKING DB SAVE
     try {
       await pool.query(
-        `INSERT INTO reports (user_id, age, biomarkers, results, ai_summary)
-         VALUES ($1, $2, $3, $4, $5)`,
+        `INSERT INTO reports (user_id, age, biomarkers, results)
+         VALUES ($1, $2, $3, $4)`,
         [
           patientId,
           age,
-          JSON.stringify(normalizedBiomarkers),
-          JSON.stringify(resultsPayload),
-          aiSummary
+          JSON.stringify(unitSafeBiomarkers),
+          JSON.stringify({
+            biologicalAge: ageResult.biologicalAge,
+            deltaAge: ageResult.deltaAge,
+            domainScores,
+            confidence
+          })
         ]
       );
     } catch (dbError) {
-      console.error("DB SAVE FAILED:", dbError.message);
+      console.error("DB ERROR (non-blocking):", dbError.message);
     }
-
-  
-    // RESPONSE
-  
-
-    res.json({
-      input: {
-        age,
-        biomarkers
-      },
-      results: resultsPayload,
-      recommendations,
-      aiSummary // 🔥 AI OUTPUT
-    });
 
   } catch (error) {
     console.error("BIO CLOCK ERROR:", error);
 
-    res.status(500).json({
+    return res.status(500).json({
       error: "Biological age calculation failed",
       details: error.message
     });
