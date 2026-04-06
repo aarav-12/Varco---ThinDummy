@@ -57,6 +57,7 @@ function getTopInsights(domainScores) {
 const calculateBiologicalAgeController = async (req, res) => {
   try {
     console.log("🔥 CONTROLLER HIT");
+    console.log("✅ REAL BIO AGE API HIT");
 
     if (!req.body || !req.body.biomarkers || !req.body.age || !req.body.patientId) {
       return res.status(400).json({
