@@ -13,21 +13,46 @@ const { normalizeUnits } = require("../services/biomarkerSanitizer");
 const { mapBiomarkers } = require("../utils/biomarkerMapper");
 const { adaptBiomarkerInput } = require("../utils/biomarkerInputAdapter");
 const { generateInsights } = require("../services/insightEngine");
-
 const { generateAllRecommendations } = require("../services/recommendationEngine.service");
 
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
 
+const { callLLM } = require("../services/llm.service"); // 🔥 AI
+
 const pool = require("../db");
 
 
-// BIOLOGICAL AGE CONTROLLER
+// AI CONTEXT BUILDER
+const buildMedicalContext = (data) => {
+  return `
+Patient Summary:
+
+- Age: ${data.age}
+- Biological Age: ${data.biologicalAge}
+- Deviation: ${data.deltaAge}
+
+Domain Scores:
+${JSON.stringify(data.domainScores, null, 2)}
+
+Biomarkers:
+${JSON.stringify(data.biomarkers, null, 2)}
+
+Instructions:
+- Be concise and structured
+- Use bullet points
+- Focus only on THIS patient's data
+- Highlight abnormal values
+- Give 3 actionable steps
+- Do NOT diagnose
+`;
+};
+
+
+// CONTROLLER
 
 const calculateBiologicalAgeController = async (req, res) => {
-
   try {
-
     console.log("🔥 CONTROLLER HIT");
 
     if (!req.body || !req.body.biomarkers || !req.body.age || !req.body.patientId) {
@@ -64,10 +89,9 @@ const calculateBiologicalAgeController = async (req, res) => {
       });
     }
 
-    
-    // =========================
+  
     // CORE ENGINE
-    // =========================
+  
 
     const zScores = calculateZScores(flattenedBiomarkers, reference);
     const severity = applyDirectionality(zScores, reference);
@@ -94,10 +118,43 @@ const calculateBiologicalAgeController = async (req, res) => {
       confidence
     };
 
-   
-    // =========================
-    // AUTO GENERATE RECOMMENDATIONS
-    // =========================
+  
+    // AI SUMMARY
+  
+
+    let aiSummary = null;
+
+    try {
+      const context = buildMedicalContext({
+        age,
+        biologicalAge: ageResult.biologicalAge,
+        deltaAge: ageResult.deltaAge,
+        domainScores,
+        biomarkers: flattenedBiomarkers
+      });
+
+      const messages = [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: context + "\n\nGive summary, risks, and recommendations."
+            }
+          ]
+        }
+      ];
+
+      aiSummary = await callLLM(messages);
+
+    } catch (aiError) {
+      console.error("AI SUMMARY FAILED:", aiError.message);
+      aiSummary = "AI summary unavailable";
+    }
+
+  
+    // RECOMMENDATIONS
+  
 
     const recommendations = generateAllRecommendations(domainScores);
 
@@ -114,30 +171,29 @@ const calculateBiologicalAgeController = async (req, res) => {
       console.error("RECOMMENDATION SAVE FAILED:", recError.message);
     }
 
-
-    // =========================
+  
     // SAVE REPORT
-    // =========================
+  
 
     try {
       await pool.query(
-        `INSERT INTO reports (user_id, age, biomarkers, results)
-         VALUES ($1, $2, $3, $4)`,
+        `INSERT INTO reports (user_id, age, biomarkers, results, ai_summary)
+         VALUES ($1, $2, $3, $4, $5)`,
         [
           patientId,
           age,
           JSON.stringify(normalizedBiomarkers),
-          JSON.stringify(resultsPayload)
+          JSON.stringify(resultsPayload),
+          aiSummary
         ]
       );
     } catch (dbError) {
       console.error("DB SAVE FAILED:", dbError.message);
     }
 
-    
-    // =========================
+  
     // RESPONSE
-    // =========================
+  
 
     res.json({
       input: {
@@ -145,20 +201,18 @@ const calculateBiologicalAgeController = async (req, res) => {
         biomarkers
       },
       results: resultsPayload,
-      recommendations //  optional but useful for frontend
+      recommendations,
+      aiSummary // 🔥 AI OUTPUT
     });
 
   } catch (error) {
-
     console.error("BIO CLOCK ERROR:", error);
 
     res.status(500).json({
       error: "Biological age calculation failed",
       details: error.message
     });
-
   }
-
 };
 
 module.exports = {
