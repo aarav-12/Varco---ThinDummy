@@ -20,7 +20,16 @@ const aliasMap = {
   IL6: ["il6", "il-6"],
 
   // 💪 MUSCLE
-  CKMM: ["ck", "cpk", "cpk(total)", "cpktotal", "creatinekinase"],
+  CKMM: [
+    "ck",
+    "cpk",
+    "cpk(total)",
+    "cpktotal",
+    "creatinekinase",
+    "ckmm",
+    "ck-mm"
+  ],
+
   AldolaseA: ["aldolase", "aldolasea"],
 
   // 🫀 LIPIDS
@@ -57,7 +66,23 @@ const aliasMap = {
   TotalProtein: ["totalprotein"],
   Albumin: ["albumin"],
   Globulin: ["globulin"],
-  TGFb1: ["tgfb1", "tgf-b1"],
+
+  // 🔥 FIXED (Unicode + normalization safe)
+  TGFb1: [
+    "tgfb1",
+    "tgf-b1",
+    "tgfβ1",
+    "tgf-β1",
+    "tgf1"     // ⭐ critical after normalization
+  ],
+
+  // 🔥 NEW (correct biomarker)
+  MMP9: [
+    "mmp9",
+    "mmp-9"
+  ],
+
+  // (keep old if needed)
   MMP3: ["mmp3", "mmp-3"],
 
   // 🦴 ADVANCED / EDGE
