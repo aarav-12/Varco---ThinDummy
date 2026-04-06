@@ -21,7 +21,13 @@ const biomarkerReference = {
 
   // 🦴 BONE
   PINP: { mean: 50, sd: 20, direction: "high_worse", domain: "bone", unit: "ng/mL" },
-  CTXII: { mean: 300, sd: 100, direction: "high_worse", domain: "bone", unit: "ng/mL" },
+  CTXII: {
+  mean: 0.3,
+  sd: 0.15,
+  unit: "ng/mL",
+  direction: "high_worse",
+  domain: "bone"
+},
   Osteocalcin: { mean: 20, sd: 10, direction: "low_worse", domain: "bone", unit: "ng/mL" },
 
   // 💪 MUSCLE

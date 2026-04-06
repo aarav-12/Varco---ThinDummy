@@ -3,29 +3,34 @@
 function normalizeUnits(biomarkers) {
   const normalized = {};
 
-  // 🔥 VALID RANGES (sanity filter)
-  const ranges = {
-    MDA: { min: 0, max: 20 },
-    CKMM: { min: 10, max: 300 },
-    AldolaseA: { min: 1, max: 25 },
-    HbA1c: { min: 3, max: 15 },
-    CRP: { min: 0, max: 50 },
-    VitaminD: { min: 5, max: 150 },
-    LDL: { min: 20, max: 300 },
-    HDL: { min: 10, max: 100 },
-    Triglycerides: { min: 30, max: 500 },
-    Creatinine: { min: 0.3, max: 5 },
-    eGFR: { min: 10, max: 200 }
+  // 🔥 SANITY BOUNDS (realistic clinical ranges)
+  const SANITY_BOUNDS = {
+    BDNF: { min: 5, max: 100 },        // ng/mL
+    MMP9: { min: 50, max: 2000 },      // ng/mL
+    CTXII: { min: 0.05, max: 2.0 },    // ng/mL
+    MDA: { min: 0.1, max: 20 },        // µmol/L
+    CRP: { min: 0.01, max: 50 },
   };
 
-  function isValid(key, value) {
-    const range = ranges[key];
-    if (!range) return true;
+  function normalizeUnit(unit) {
+    if (!unit) return "";
 
-    if (value < range.min || value > range.max) {
-      console.log("🚨 REJECTED (out of range):", key, value);
+    return unit
+      .toLowerCase()
+      .replace(/[µμ]/g, "u")       // normalize micro
+      .replace(/\s/g, "")          // remove spaces
+      .replace(/\/1\.73m2$/, "");  // remove eGFR suffix
+  }
+
+  function isPlausible(key, value) {
+    const bounds = SANITY_BOUNDS[key];
+    if (!bounds) return true;
+
+    if (value < bounds.min || value > bounds.max) {
+      console.log("🚨 REJECTED (implausible):", key, value);
       return false;
     }
+
     return true;
   }
 
@@ -34,28 +39,23 @@ function normalizeUnits(biomarkers) {
 
     if (value == null) continue;
 
-    let cleanUnit = unit?.toLowerCase().replace(/\s/g, "");
+    let cleanUnit = normalizeUnit(unit);
     const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
 
     console.log("CHECK:", key, value, unit);
-
-    // 🔥 NORMALIZE SYMBOLS
-    cleanUnit = cleanUnit
-      ?.replace(/μ/g, "u")
-      ?.replace(/µ/g, "u");
 
     
     // 🧠 HEMOGLOBIN
     
     if (cleanKey === "hemoglobin") {
       if (cleanUnit === "mg/dl") {
-        console.log("⚠️ Converting Hemoglobin mg/dL → g/dL");
+        console.log("⚠️ Hemoglobin mg/dL → g/dL");
         value = value / 100;
         unit = "g/dL";
       }
 
       if (value > 30) {
-        console.log("⚠️ Fixing Hemoglobin scale:", value);
+        console.log("⚠️ Fix Hemoglobin scale");
         value = value / 10;
       }
     }
@@ -110,36 +110,68 @@ function normalizeUnits(biomarkers) {
     }
 
     
-    // 🔥 CRITICAL FIXES (PARSER ERRORS)
+    // 🔥 CRITICAL PARSER FIXES
     
 
-    // ❗ CK-MM wrongly parsed as ng/mL
+    // CKMM wrong unit
     if (cleanKey === "ckmm" && cleanUnit === "ng/ml") {
-      console.log("🚑 Fixing CKMM unit → U/L");
+      console.log("🚑 Fix CKMM → U/L");
       unit = "U/L";
-      value = value * 10; // heuristic scale fix
+      value = value * 10;
     }
 
-    // ❗ Aldolase wrongly parsed as ng/mL
+    // Aldolase wrong unit
     if (cleanKey === "aldolasea" && cleanUnit === "ng/ml") {
-      console.log("🚑 Fixing Aldolase → U/L");
+      console.log("🚑 Fix Aldolase → U/L");
       unit = "U/L";
-      value = value / 5; // heuristic correction
+      value = value / 5;
     }
 
-    // ❗ MDA conversion (ng/mL → µmol/L)
+    // MDA conversion
     if (cleanKey === "mda" && cleanUnit === "ng/ml") {
-      console.log("🚑 Converting MDA → µmol/L");
+      console.log("🚑 MDA → µmol/L");
       value = value / 28.97;
       unit = "µmol/L";
     }
 
     
-    // ❌ REJECT BAD UNITS
+    // 🔥 SPECIAL CASE FIXES
+    
+
+    // eGFR fix (unit normalization only)
+    if (cleanKey === "egfr") {
+      unit = "mL/min"; // standardize
+    }
+
+    // BDNF fix
+    if (cleanKey === "bdnf") {
+      if (value < 1) {
+        console.log("⚠️ BDNF suspicious → trying pg→ng");
+        value = value * 1000;
+      }
+
+      if (!isPlausible("BDNF", value)) continue;
+    }
+
+    // MMP9 fix
+    if (cleanKey === "mmp9") {
+      if (value < 10) {
+        console.log("🚨 Reject MMP9 bad scale");
+        continue;
+      }
+    }
+
+    // CTXII fix (assuming ng/mL correct scale)
+    if (cleanKey === "ctxii") {
+      // no conversion needed if reference fixed
+    }
+
+    
+    // ❌ BAD UNIT REJECTION
     
     if (
-      cleanUnit?.includes("x10") ||
-      cleanUnit?.includes("^")
+      cleanUnit.includes("x10") ||
+      cleanUnit.includes("^")
     ) {
       console.log("🚨 REJECTED (invalid unit):", key, unit);
       continue;
@@ -148,7 +180,7 @@ function normalizeUnits(biomarkers) {
     
     // ❌ FINAL SANITY CHECK
     
-    if (!isValid(key, value)) continue;
+    if (!isPlausible(key, value)) continue;
 
     
     // ✅ FINAL STORE
