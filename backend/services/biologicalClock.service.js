@@ -165,7 +165,7 @@ function calculateCompositeScore(domainScores, domainWeights) {
   const adjusted = compositeScore * coverageFactor;
 
   // 🔥 Non-linear stacking
-  const boosted = adjusted + 0.5 * (adjusted ** 2);
+  const boosted = adjusted + 0.35 * (adjusted ** 2);
 
   return Number(boosted.toFixed(4));
 }
