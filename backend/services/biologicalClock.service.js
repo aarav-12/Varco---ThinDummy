@@ -1,3 +1,4 @@
+
 // Z SCORE CALCULATION
 
 function calculateZScore(value, mean, sd) {
@@ -24,6 +25,7 @@ function calculateZScores(patientBiomarkers, referenceData) {
   return zScores;
 }
 
+
 // DIRECTIONALITY
 
 function applyDirectionality(zScores, referenceData) {
@@ -39,13 +41,14 @@ function applyDirectionality(zScores, referenceData) {
       z = -z;
     }
 
-    severity[biomarker] = Math.abs(z);
+    severity[biomarker] = Math.max(0, z);
   }
 
   return severity;
 }
 
-// DOMAIN SCORES (FIXED)
+
+// DOMAIN SCORES
 
 function calculateDomainScores(severityScores, referenceData) {
   const domainBuckets = {};
@@ -68,18 +71,45 @@ function calculateDomainScores(severityScores, referenceData) {
   for (const domain in domainBuckets) {
     const values = domainBuckets[domain];
 
-    const rms = Math.sqrt(
-      values.reduce((sum, v) => sum + v * v, 0) / values.length
-    );
+    // 🔥 Step 1: Biomarker-level amplification
+    const boostedValues = values.map(v => {
+      let boosted = v + 0.2 * Math.pow(v, 1.5);
 
-    // ✅ LOW SAMPLE PENALTY
-    const adjusted = rms * Math.sqrt(values.length / 3);
+      // 🔥 Extra boost for extreme biomarkers
+      if (v > 2.5) {
+        boosted *= 1.25;
+        boosted += 0.5;
+      }
 
-    domainScores[domain] = Number(adjusted.toFixed(4));
+      return boosted;
+    });
+
+    // 🔢 Step 2: Average
+    const sum = boostedValues.reduce((sum, v) => sum + v, 0);
+    const avg = sum / boostedValues.length;
+
+    // 🔥 Step 3: Conditional stacking boost
+    let stackingBoost = 1;
+    if (avg > 0.6) {
+      stackingBoost = 1 + 0.1 * Math.log1p(boostedValues.length);
+    }
+
+    const adjustedAvg = avg * stackingBoost;
+
+    // 🔥 Step 4: Normalization
+    let normalized = adjustedAvg / (1 + adjustedAvg);
+
+    // 🔥 Step 5: Mild-domain damping (final calibration)
+    if (adjustedAvg < 0.6) {
+      normalized *= 0.75;
+    }
+
+    domainScores[domain] = Number(normalized.toFixed(4));
   }
 
   return domainScores;
 }
+
 
 // DOMAIN CONTRIBUTIONS
 
@@ -100,7 +130,8 @@ function calculateDomainContributions(domainScores, domainWeights, k = 6) {
   return contributions;
 }
 
-// COMPOSITE SCORE (WITH COVERAGE FIX)
+
+// COMPOSITE SCORE
 
 function calculateCompositeScore(domainScores, domainWeights) {
   let weightSum = 0;
@@ -117,16 +148,21 @@ function calculateCompositeScore(domainScores, domainWeights) {
     const score = domainScores[domain];
     const normalizedWeight = (domainWeights[domain] || 0) / weightSum;
 
-    compositeScore += score * normalizedWeight;
+    compositeScore += (score * normalizedWeight) * (1 - 0.2 * compositeScore);
   }
 
-  // ✅ COVERAGE DAMPING
-  const coverageFactor = Math.min(1, Object.keys(domainScores).length / 5);
+  const coverageFactor = Math.min(1, Object.keys(domainScores).length / 7);
 
-  return compositeScore * coverageFactor;
+  const adjusted = compositeScore * coverageFactor;
+
+  // 🔥 Non-linear stacking
+  const boosted = adjusted + 0.5 * (adjusted ** 2);
+
+  return Number(boosted.toFixed(4));
 }
 
-// BIOLOGICAL AGE (FINAL — NO CONFIDENCE HERE)
+
+// BIOLOGICAL AGE
 
 function calculateBiologicalAge(compositeScore, chronologicalAge, k = 6) {
   const rawDeltaAge = compositeScore * k;
@@ -144,7 +180,8 @@ function calculateBiologicalAge(compositeScore, chronologicalAge, k = 6) {
   };
 }
 
-// CONFIDENCE (ONLY FOR UI)
+
+// CONFIDENCE
 
 function calculateConfidence(flattened, reference) {
   const total = Object.keys(reference).length;
@@ -164,7 +201,8 @@ function calculateConfidence(flattened, reference) {
   return Math.min(1, Number(score.toFixed(2)));
 }
 
-// MASTER FUNCTION (FIXED ORDER)
+
+// MASTER FUNCTION
 
 function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights) {
   const zScores = calculateZScores(patientBiomarkers, referenceData);
@@ -191,6 +229,7 @@ function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights
   };
 }
 
+
 // RISK SCORE
 
 function calculateRiskScore(compositeScore) {
@@ -201,6 +240,7 @@ function calculateRiskScore(compositeScore) {
 
   return Number(riskScore.toFixed(2));
 }
+
 
 // EXPORTS
 

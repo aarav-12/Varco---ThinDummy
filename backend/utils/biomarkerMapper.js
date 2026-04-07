@@ -131,13 +131,21 @@ function mapBiomarkers(inputBiomarkers) {
       const biomarker = inputBiomarkers[key];
 
       // ✅ VALIDATE STRUCTURE
-      if (!biomarker || typeof biomarker.value !== "number" || !biomarker.unit) {
-        rejected.push({
-          name: key,
-          reason: "Invalid structure (missing unit or value)"
-        });
-        continue;
-      }
+      if (!biomarker) {
+  rejected.push({ name: key, reason: "Missing biomarker object" });
+  continue;
+}
+
+// 🔥 AUTO-FIX MISSING STRUCTURE
+if (typeof biomarker.value !== "number") {
+  console.log("⚠️ FIXING VALUE:", key);
+  biomarker.value = parseFloat(biomarker.value) || 0;
+}
+
+if (!biomarker.unit) {
+  console.log("⚠️ MISSING UNIT:", key);
+  biomarker.unit = "unknown";
+}
 
       // ✅ PREVENT DUPLICATE OVERRIDE
       if (!mapped[found]) {

@@ -1,12 +1,11 @@
 const domainWeights = {
-
-  inflammation: 0.16,
-  endocrine: 0.16,
-  bone: 0.20,
-  muscle: 0.18,
-  oxidative: 0.15,
-  neurovascular: 0.15
-
+  IRF: 0.18,
+  AVF: 0.18,
+  CMF: 0.16,
+  BMF: 0.13,
+  MHF: 0.12,
+  PNF: 0.10,
+  RFF: 0.09
 };
 
 module.exports = domainWeights;

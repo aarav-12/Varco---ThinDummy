@@ -5,7 +5,7 @@ function normalizeUnits(biomarkers) {
 
   // 🔥 SANITY BOUNDS (realistic clinical ranges)
   const SANITY_BOUNDS = {
-    BDNF: { min: 5, max: 100 },        // ng/mL
+    BDNF: { min: 1, max: 100 },        // ng/mL
     MMP9: { min: 50, max: 2000 },      // ng/mL
     CTXII: { min: 0.05, max: 2.0 },    // ng/mL
     MDA: { min: 0.1, max: 20 },        // µmol/L
