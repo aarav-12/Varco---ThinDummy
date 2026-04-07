@@ -174,9 +174,9 @@ function calculateCompositeScore(domainScores, domainWeights) {
 // BIOLOGICAL AGE
 
 function calculateBiologicalAge(compositeScore, chronologicalAge, k = 5.7) {
-  const rawDeltaAge = compositeScore * k;
+  const rawDeltaAge = compositeScore * 5.5;
 
-  const dampingFactor = 25;
+  const dampingFactor = 23;
 
   const adjustedDeltaAge =
     rawDeltaAge / (1 + Math.abs(rawDeltaAge) / dampingFactor);
