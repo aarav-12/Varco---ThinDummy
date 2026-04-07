@@ -49,6 +49,7 @@ exports.submitPatient = async (req, res) => {
 
     // 🔥 ensure age is number
     const numericAge = Number(requestAge);
+    const safeAge = Number.isFinite(numericAge) ? Math.round(numericAge) : null;
 
     const rawInputs = {
       painLevel,
@@ -56,7 +57,7 @@ exports.submitPatient = async (req, res) => {
       canWalk: canWalk ?? null,
       hasSwelling: hasSwelling ?? null,
       biomarkers: biomarkerMap,
-      age: numericAge
+      age: safeAge
     };
 
     // ================= ALGORITHM =================
@@ -75,7 +76,7 @@ exports.submitPatient = async (req, res) => {
 
     // 🔥 SANITIZE VALUES (THIS IS THE FIX)
     const safeBiologicalAge = Number.isFinite(result.biologicalAge)
-      ? result.biologicalAge
+      ? Math.round(result.biologicalAge)
       : null;
 
     const safeDeviation = Number.isFinite(result.deviation)
@@ -114,13 +115,13 @@ exports.submitPatient = async (req, res) => {
        RETURNING id, biological_age`,
       [
         name,
-        age || null,
+        safeAge,
         gender || null,
         rawInputs,
         result.biomarkers,
         result.biomarkerSeverity,
         safeBiologicalAge, // ✅ FIXED
-        age || null,
+        safeAge,
         aiSummary
       ]
     );
