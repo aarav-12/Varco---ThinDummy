@@ -43,18 +43,21 @@ ${text}
       {
         role: "user",
         content: `
-Extract ANY biomarker-related values from this report.
+Extract ALL possible lab values from this medical report.
 
-RULES:
-- Prefer real lab values
-- If not available, include Z-scores
-- Return ONLY JSON
-- No explanation
+IMPORTANT:
+- Extract ANY numeric medical value you see
+- Do NOT worry about correctness
+- Do NOT skip values because of formatting
+- Tables, broken text, OCR - still extract
+- Even partial or uncertain values are OK
 
-FORMAT:
-{
-  "CRP": { "value": number, "unit": "mg/L or Z-score" }
-}
+Return STRICT JSON ARRAY:
+[
+  { "name": "CRP", "value": 2.5, "unit": "mg/L" }
+]
+
+DO NOT return empty array unless absolutely nothing exists.
 
 REPORT:
 ${text}
@@ -64,11 +67,27 @@ ${text}
 
     response = await callLLM(fallbackPrompt);
     parsed = safeParse(response);
+
+    // 🔥 convert array → object
+    if (Array.isArray(parsed)) {
+      const mapped = {};
+      for (const item of parsed) {
+        if (item.name && item.value !== undefined) {
+          mapped[item.name] = {
+            value: item.value,
+            unit: item.unit || "unknown"
+          };
+        }
+      }
+      parsed = mapped;
+    }
   }
 
   if (!parsed || Object.keys(parsed).length === 0) {
     throw new Error("AI could not extract biomarkers");
   }
+
+  console.log("✅ Extracted Biomarkers:", parsed);
 
   return parsed;
 }
