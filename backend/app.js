@@ -15,9 +15,21 @@ const biologicalClockRoutes = require("./routes/biologicalClock.routes");
 const recommendationsRoutes = require("./routes/recommendations.routes");
 const reportRoutes = require("./routes/report.routes");
 const adminRoutes = require("./routes/admin.routes");
-// /* MIDDLEWARE */
-// app.use(cors());
-// app.use(express.json());
+
+/* MIDDLEWARE */
+app.use(cors({
+  origin: "*", // or your frontend domain later
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "apikey",
+    "x-client-info"
+  ]
+}));
+app.options("*", cors());
+app.use(express.json());
+
 app.use("/api/report", reportRoutes);
 /* LOGGER (put AFTER middleware, BEFORE routes is also fine) */
 app.use((req, res, next) => {
