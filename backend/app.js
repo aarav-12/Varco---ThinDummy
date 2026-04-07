@@ -27,7 +27,7 @@ app.use(cors({
     "x-client-info"
   ]
 }));
-app.options("*", cors());
+app.options("/*", cors());
 app.use(express.json());
 
 app.use("/api/report", reportRoutes);
