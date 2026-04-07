@@ -98,10 +98,25 @@ const calculateBiologicalAgeController = async (req, res) => {
       flattenedBiomarkers[key] = unitSafeBiomarkers[key].value;
     }
 
-    if (Object.keys(flattenedBiomarkers).length < 2) {
-      return res.status(400).json({
-        error: "Not enough biomarkers",
-        message: "Minimum 2 biomarkers required"
+    const count = Object.keys(flattenedBiomarkers).length;
+
+    let confidenceLabel = "Low";
+    let note = "Limited data, results may not be accurate";
+
+    if (count >= 10) {
+      confidenceLabel = "High";
+      note = "High confidence estimate";
+    } else if (count >= 5) {
+      confidenceLabel = "Medium";
+      note = "Moderate confidence estimate";
+    } else if (count >= 2) {
+      confidenceLabel = "Low";
+      note = "Very limited data, low accuracy";
+    } else {
+      return res.status(200).json({
+        success: false,
+        type: "INSUFFICIENT_DATA",
+        message: "At least 2 biomarkers required"
       });
     }
 
@@ -144,18 +159,6 @@ const calculateBiologicalAgeController = async (req, res) => {
       ...(unitRejected || [])
     ];
 
-    const dataPoints = Object.keys(flattenedBiomarkers).length;
-
-    const confidenceLabel =
-      confidence > 0.75 ? "High" :
-      confidence > 0.5 ? "Moderate" :
-      "Low";
-
-    const note =
-      dataPoints < 5
-        ? "Add more biomarkers for higher accuracy"
-        : "Sufficient data for a reliable estimate";
-
     const topIssues = getTopInsights(domainScores);
 
     // ✅ FINAL RESPONSE
@@ -170,16 +173,14 @@ const calculateBiologicalAgeController = async (req, res) => {
       domainScores,
       confidence,
 
-      confidenceLabel,
-      dataPoints,
-      note,
-
       topIssues,
 
       algorithmVersion: "3.0"
     };
 
-    response.note = "Estimated from partial/derived data";
+    response.confidenceLabel = confidenceLabel;
+    response.note = note;
+    response.dataPoints = count;
     response.source = "pdf_upload";
 
     res.json(response);
