@@ -53,6 +53,7 @@ function applyDirectionality(zScores, referenceData) {
 function calculateDomainScores(severityScores, referenceData) {
   const domainBuckets = {};
 
+  // 🔹 GROUP BY DOMAIN
   for (const biomarker in severityScores) {
     const ref = referenceData[biomarker];
     if (!ref) continue;
@@ -71,11 +72,11 @@ function calculateDomainScores(severityScores, referenceData) {
   for (const domain in domainBuckets) {
     const values = domainBuckets[domain];
 
-    // 🔥 Step 1: Biomarker-level amplification
+    // 🔥 STEP 1 — BIOMARKER-LEVEL AMPLIFICATION
     const boostedValues = values.map(v => {
       let boosted = v + 0.2 * Math.pow(v, 1.5);
 
-      // 🔥 Extra boost for extreme biomarkers
+      // 🔥 Extreme boost
       if (v > 2.5) {
         boosted *= 1.25;
         boosted += 0.5;
@@ -84,23 +85,32 @@ function calculateDomainScores(severityScores, referenceData) {
       return boosted;
     });
 
-    // 🔢 Step 2: Average
+    // 🔢 STEP 2 — AVERAGE
     const sum = boostedValues.reduce((sum, v) => sum + v, 0);
-    const avg = sum / boostedValues.length;
+    let avg = sum / boostedValues.length;
 
-    // 🔥 Step 3: Conditional stacking boost
+    // 🔥 STEP 2.5 — BASELINE ACTIVATION (CRITICAL FIX)
+    if (avg === 0 && values.length > 0) {
+      avg = 0.05 + 0.01 * values.length; 
+      // small adaptive baseline (more biomarkers = slightly higher signal)
+    }
+
+    // 🔥 STEP 3 — STACKING BOOST
     let stackingBoost = 1;
+
     if (avg > 0.6) {
       stackingBoost = 1 + 0.1 * Math.log1p(boostedValues.length);
     }
 
     const adjustedAvg = avg * stackingBoost;
 
-    // 🔥 Step 4: Normalization
+    // 🔥 STEP 4 — NORMALIZATION
     let normalized = adjustedAvg / (1 + adjustedAvg);
-
-    // 🔥 Step 5: Mild-domain damping (final calibration)
-    if (adjustedAvg < 0.6) {
+if (normalized > 0.3) {
+  normalized = normalized + 0.25 * Math.pow(normalized, 1.5);
+}
+    // 🔥 STEP 5 — MILD DOMAIN DAMPING (ONLY IF NOT BASELINE)
+    if (adjustedAvg < 0.6 && avg > 0.06) {
       normalized *= 0.75;
     }
 
@@ -109,7 +119,6 @@ function calculateDomainScores(severityScores, referenceData) {
 
   return domainScores;
 }
-
 
 // DOMAIN CONTRIBUTIONS
 

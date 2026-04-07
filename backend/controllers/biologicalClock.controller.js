@@ -11,23 +11,21 @@ const { normalizeUnits } = require("../services/biomarkerSanitizer");
 const { mapBiomarkers } = require("../utils/biomarkerMapper");
 const { adaptBiomarkerInput } = require("../utils/biomarkerInputAdapter");
 const { applyUnitConversion } = require("../utils/unitConversion");
+const { inferMissingBiomarkers } = require("../services/fallbackInference");
 
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
 const pool = require("../db");
 
 
-// 🔥 STEP 2 — TOP INSIGHTS FUNCTION
+// 🔥 TOP INSIGHTS
 function getTopInsights(domainScores) {
-
   const entries = Object.entries(domainScores);
-
   entries.sort((a, b) => b[1] - a[1]);
 
   const top = entries.slice(0, 2);
 
   return top.map(([domain, score]) => {
-
     let impact = "Low";
     if (score > 0.8) impact = "High";
     else if (score > 0.5) impact = "Moderate";
@@ -57,7 +55,6 @@ function getTopInsights(domainScores) {
 const calculateBiologicalAgeController = async (req, res) => {
   try {
     console.log("🔥 CONTROLLER HIT");
-    console.log("✅ REAL BIO AGE API HIT");
 
     if (!req.body || !req.body.biomarkers || !req.body.age || !req.body.patientId) {
       return res.status(400).json({
@@ -67,23 +64,35 @@ const calculateBiologicalAgeController = async (req, res) => {
 
     const { biomarkers: rawBiomarkers, age, patientId } = req.body;
 
-    // STEP 1 — ADAPT
+    // ✅ STEP 1 — ADAPT
     const biomarkers = adaptBiomarkerInput(rawBiomarkers);
 
-    // STEP 2 — MAP
+    // ✅ STEP 2 — MAP
     const { mapped: mappedBiomarkers, rejected: mappingRejected } = mapBiomarkers(biomarkers);
 
-    // STEP 3 — NORMALIZE
-    const normalizedBiomarkers = normalizeUnits(mappedBiomarkers);
+    // ✅ STEP 3 — INFERENCE
+    const inferred = inferMissingBiomarkers(mappedBiomarkers);
 
-    // STEP 4 — UNIT CONVERSION
+    console.log("🧠 INFERRED:", inferred);
+
+    const enrichedBiomarkers = {
+      ...inferred,
+      ...mappedBiomarkers
+    };
+
+    console.log("📦 FINAL INPUT:", enrichedBiomarkers);
+
+    // ✅ STEP 4 — NORMALIZE
+    const normalizedBiomarkers = normalizeUnits(enrichedBiomarkers);
+
+    // ✅ STEP 5 — UNIT CONVERSION
     const {
       converted: unitSafeBiomarkers,
       conversionLog,
       rejected: unitRejected
     } = applyUnitConversion(normalizedBiomarkers, biomarkerReference);
 
-    // STEP 5 — FLATTEN
+    // ✅ STEP 6 — FLATTEN
     const flattenedBiomarkers = {};
     for (const key in unitSafeBiomarkers) {
       flattenedBiomarkers[key] = unitSafeBiomarkers[key].value;
@@ -96,8 +105,32 @@ const calculateBiologicalAgeController = async (req, res) => {
       });
     }
 
-    // STEP 6 — CORE ENGINE
-    const zScores = calculateZScores(flattenedBiomarkers, biomarkerReference);
+    // 🔥 STEP 7 — SOURCE WEIGHTING (CRITICAL FIX)
+    const weightedBiomarkers = {};
+
+    for (const key in unitSafeBiomarkers) {
+      const biomarker = unitSafeBiomarkers[key];
+
+      let weight = 1;
+
+      if (biomarker.inferred) {
+        weight = 0.6;
+      }
+
+      if (biomarker.warnings) {
+        weight *= 0.8;
+      }
+
+      weightedBiomarkers[key] = flattenedBiomarkers[key] * weight;
+    }
+
+    // 🔥 LOW DATA WARNING
+    if (Object.keys(flattenedBiomarkers).length < 5) {
+      console.log("⚠️ Low data mode");
+    }
+
+    // ✅ STEP 8 — CORE ENGINE
+    const zScores = calculateZScores(weightedBiomarkers, biomarkerReference);
     const severity = applyDirectionality(zScores, biomarkerReference);
     const domainScores = calculateDomainScores(severity, biomarkerReference);
 
@@ -105,13 +138,12 @@ const calculateBiologicalAgeController = async (req, res) => {
     const ageResult = calculateBiologicalAge(compositeScore, age);
     const confidence = calculateConfidence(flattenedBiomarkers, biomarkerReference);
 
-    // STEP 7 — TRACEABILITY
+    // ✅ STEP 9 — TRACEABILITY
     const rejected = [
       ...(mappingRejected || []),
       ...(unitRejected || [])
     ];
 
-    // STEP 8 — TRUST LAYER
     const dataPoints = Object.keys(flattenedBiomarkers).length;
 
     const confidenceLabel =
@@ -124,11 +156,10 @@ const calculateBiologicalAgeController = async (req, res) => {
         ? "Add more biomarkers for higher accuracy"
         : "Sufficient data for a reliable estimate";
 
-    // STEP 9 — INSIGHTS
     const topIssues = getTopInsights(domainScores);
 
     // ✅ FINAL RESPONSE
-    res.json({
+    const response = {
       biologicalAge: ageResult.biologicalAge,
       deltaAge: ageResult.deltaAge,
 
@@ -145,8 +176,13 @@ const calculateBiologicalAgeController = async (req, res) => {
 
       topIssues,
 
-      algorithmVersion: "2.0"
-    });
+      algorithmVersion: "3.0"
+    };
+
+    response.note = "Estimated from partial/derived data";
+    response.source = "pdf_upload";
+
+    res.json(response);
 
     // ✅ NON-BLOCKING DB SAVE
     try {

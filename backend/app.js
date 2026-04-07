@@ -15,11 +15,10 @@ const biologicalClockRoutes = require("./routes/biologicalClock.routes");
 const recommendationsRoutes = require("./routes/recommendations.routes");
 const reportRoutes = require("./routes/report.routes");
 const adminRoutes = require("./routes/admin.routes");
-
-/* MIDDLEWARE */
-app.use(cors());
-app.use(express.json());
-
+// /* MIDDLEWARE */
+// app.use(cors());
+// app.use(express.json());
+app.use("/api/report", reportRoutes);
 /* LOGGER (put AFTER middleware, BEFORE routes is also fine) */
 app.use((req, res, next) => {
   console.log("➡ Incoming request:", req.method, req.originalUrl);
