@@ -31,31 +31,55 @@ exports.submitPatient = async (req, res) => {
 
     console.log("✅ STEP 1: Validation passed");
 
+    const { biomarkers, age: requestAge } = req.body;
+
+    // 🔥 convert array → object map
+    const biomarkerMap = {};
+
+    if (Array.isArray(biomarkers)) {
+      biomarkers.forEach(b => {
+        if (b.name && b.value !== undefined) {
+          biomarkerMap[b.name] = {
+            value: Number(b.value),
+            unit: b.unit || ""
+          };
+        }
+      });
+    }
+
+    // 🔥 ensure age is number
+    const numericAge = Number(requestAge);
+
     const rawInputs = {
       painLevel,
       symptoms: symptoms || null,
       canWalk: canWalk ?? null,
-      hasSwelling: hasSwelling ?? null
+      hasSwelling: hasSwelling ?? null,
+      biomarkers: biomarkerMap,
+      age: numericAge
     };
 
     // ================= ALGORITHM =================
     console.log("🧠 STEP 2: Running algorithm...");
 
-    const algoResult = runAlgorithm(rawInputs, age);
+    const result = runAlgorithm({
+      biomarkers: biomarkerMap,
+      age: numericAge
+    });
 
-    console.log("✅ STEP 2 DONE:", algoResult);
+    console.log("✅ STEP 2 DONE:", result);
 
-    if (!algoResult) {
+    if (!result) {
       throw new Error("Algorithm returned undefined");
     }
 
     // 🔥 SANITIZE VALUES (THIS IS THE FIX)
-    const safeBiologicalAge = Number.isFinite(algoResult.biologicalAge)
-      ? algoResult.biologicalAge
+    const safeBiologicalAge = Number.isFinite(result.biologicalAge)
+      ? result.biologicalAge
       : null;
 
-    const safeDeviation = Number.isFinite(algoResult.deviation)
-      ? algoResult.deviation
+    const safeDeviation = Number.isFinite(result.deviation)
+      ? result.deviation
       : null;
 
     console.log("🧪 SANITIZED:", {
@@ -71,7 +95,7 @@ exports.submitPatient = async (req, res) => {
 
       aiSummary = await generateExplanation({
         deviation: safeDeviation,
-        severity: algoResult.biomarkerSeverity
+        severity: result.biomarkerSeverity
       });
 
       console.log("✅ STEP 3 DONE: AI response received");
@@ -83,7 +107,7 @@ exports.submitPatient = async (req, res) => {
     // ================= DB =================
     console.log("🗄️ STEP 4: Inserting into DB...");
 
-    const result = await pool.query(
+    const dbResult = await pool.query(
       `INSERT INTO patients 
       (name, age, gender, raw_inputs, biomarkers, risk_scores, biological_age, chronological_age, ai_summary)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
@@ -93,8 +117,8 @@ exports.submitPatient = async (req, res) => {
         age || null,
         gender || null,
         rawInputs,
-        algoResult.biomarkers,
-        algoResult.biomarkerSeverity,
+        result.biomarkers,
+        result.biomarkerSeverity,
         safeBiologicalAge, // ✅ FIXED
         age || null,
         aiSummary
@@ -105,11 +129,11 @@ exports.submitPatient = async (req, res) => {
 
     return res.status(201).json({
       message: "Patient submitted successfully",
-      patientId: result.rows[0].id,
+      patientId: dbResult.rows[0].id,
       biologicalAge: safeBiologicalAge,
       deviation: safeDeviation,
-      biomarkers: algoResult.biomarkers,
-      severity: algoResult.biomarkerSeverity,
+      biomarkers: result.biomarkers,
+      severity: result.biomarkerSeverity,
       aiSummary
     });
 
