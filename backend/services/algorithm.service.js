@@ -6,7 +6,6 @@ const {
   applyDirectionality,
   calculateDomainScores,
   calculateCompositeScore,
-  calculateBiologicalAge,
   calculateConfidence,
   calculateDomainContributions,
   calculateRiskScore
@@ -24,7 +23,7 @@ function runAlgorithm({ biomarkers, age }) {
     throw new Error("Missing biomarkers or age");
   }
 
-  // 🔥 STEP 0: Map + normalize biomarkers
+  // 🔥 STEP 0: Map
   const { mapped, rejected } = mapBiomarkers(biomarkers);
   console.log("🧠 MAPPED BIOMARKERS:", mapped);
 
@@ -32,27 +31,18 @@ function runAlgorithm({ biomarkers, age }) {
     throw new Error("No valid biomarkers after mapping");
   }
 
-  console.log("🧪 RAW MAPPED INPUT:", mapped);
-
-  // 🔥 STEP 1: Flatten values
+  // 🔥 STEP 1: Flatten
   const flattened = {};
   const matched = [];
-  const converted = [];
 
   for (const key in mapped) {
     flattened[key] = mapped[key].value ?? mapped[key];
     matched.push(key);
   }
 
-  console.log("📊 REFERENCE KEYS:", Object.keys(biomarkerReference));
-  console.log("📥 INPUT KEYS:", Object.keys(flattened));
-
-  console.log("🧪 AFTER CONVERSION:", flattened);
-  console.log("🔁 CONVERSIONS APPLIED:", converted);
-
   const biomarkerCount = Object.keys(flattened).length;
 
-  // 🔥 STEP 1.5: Data quality scoring
+  // 🔥 STEP 1.5: Data quality
   let dataQuality = "low";
   let confidenceMultiplier = 0.7;
 
@@ -65,15 +55,13 @@ function runAlgorithm({ biomarkers, age }) {
   }
 
   if (biomarkerCount < 3) {
-    throw new Error("At least 3 biomarkers required for meaningful analysis");
+    throw new Error("At least 3 biomarkers required");
   }
 
-  // 🔥 STEP 2: Core biological clock pipeline
+  // 🔥 STEP 2: Core pipeline
 
   const zScores = calculateZScores(flattened, biomarkerReference);
-
   const severity = applyDirectionality(zScores, biomarkerReference);
-
   const domainScores = calculateDomainScores(severity, biomarkerReference);
 
   console.log("📊 DOMAIN SCORES:", domainScores);
@@ -83,18 +71,43 @@ function runAlgorithm({ biomarkers, age }) {
     domainWeights
   );
 
-  // 🚀 STEP 2.5 — COVERAGE FIX (CRITICAL)
+  // 🚀 COVERAGE FIX
   const expectedDomains = 7;
-
   const activeDomains = Object.values(domainScores).filter(v => v > 0).length;
-
   const coverageFactor = 0.85 + 0.15 * (activeDomains / expectedDomains);
 
   const adjustedCompositeScore = compositeScore * coverageFactor;
 
-  console.log("📊 ACTIVE DOMAINS:", activeDomains);
-  console.log("📊 COVERAGE FACTOR:", coverageFactor);
   console.log("📊 ADJUSTED COMPOSITE:", adjustedCompositeScore);
+
+  // 🔥 STEP 3 — NON-LINEAR AMPLIFICATION (MAIN FIX)
+  const amplified =
+    adjustedCompositeScore * (1 + 0.8 * adjustedCompositeScore);
+
+  // 🔥 STEP 4 — BASE DELTA
+  let delta = amplified * 8;
+
+  // 🔥 STEP 5 — HIGH-RISK BOOST (CRITICAL FIX)
+  let riskBoost = 0;
+
+  if (flattened.IL6 && flattened.IL6 > 20) {
+    riskBoost += 1.5;
+  }
+
+  if (flattened.MDA && flattened.MDA > 30) {
+    riskBoost += 1;
+  }
+
+  if (flattened.Triglycerides && flattened.Triglycerides > 150) {
+    riskBoost += 0.5;
+  }
+
+  if (flattened.CRPExtreme && flattened.CRPExtreme > 5) {
+    riskBoost += 0.5;
+  }
+
+  // 🔥 STEP 6 — FINAL AGE
+  const biologicalAge = age + delta + riskBoost;
 
   const domainContributions = calculateDomainContributions(
     domainScores,
@@ -103,24 +116,12 @@ function runAlgorithm({ biomarkers, age }) {
 
   const riskScore = calculateRiskScore(adjustedCompositeScore);
 
-  const ageResult = calculateBiologicalAge(
-    adjustedCompositeScore,
-    age
-  );
-
-  let confidence = calculateConfidence(
-    flattened,
-    biomarkerReference
-  );
-
-  // 🔥 apply data quality penalty
+  let confidence = calculateConfidence(flattened, biomarkerReference);
   confidence = confidence * confidenceMultiplier;
 
-  // 🚀 FINAL OUTPUT
-
   return {
-    biologicalAge: ageResult.biologicalAge,
-    deltaAge: ageResult.deltaAge,
+    biologicalAge: Number(biologicalAge.toFixed(1)),
+    deltaAge: Number((biologicalAge - age).toFixed(2)),
 
     matched,
     rejected,
@@ -128,8 +129,8 @@ function runAlgorithm({ biomarkers, age }) {
     domainScores,
     domainContributions,
 
-    compositeScore: adjustedCompositeScore, // ✅ IMPORTANT CHANGE
-    rawCompositeScore: compositeScore,      // ✅ debug visibility
+    compositeScore: adjustedCompositeScore,
+    rawCompositeScore: compositeScore,
 
     riskScore,
 
@@ -140,22 +141,21 @@ function runAlgorithm({ biomarkers, age }) {
 
     dataPoints: biomarkerCount,
     activeDomains,
-
     coverageFactor,
 
     coverageWarning:
       activeDomains < 5
-        ? "Low domain coverage. Some biological systems are not represented."
+        ? "Low domain coverage."
         : null,
 
     dataQuality,
 
     note:
       dataQuality === "low"
-        ? "Limited biomarkers detected. Add more reports for higher accuracy."
-        : "Sufficient biomarkers for reliable estimation.",
+        ? "Limited biomarkers."
+        : "Sufficient biomarkers.",
 
-    algorithmVersion: "2.3"
+    algorithmVersion: "3.0"
   };
 }
 
