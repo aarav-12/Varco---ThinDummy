@@ -1,8 +1,7 @@
-// 🔥 HYBRID FALLBACK EXTRACTOR (LLM BACKUP)
-
 function fallbackExtract(text) {
+  if (!text || typeof text !== "string") return {};
+
   const patterns = {
-    // 🔬 Inflammation / Advanced
     CRP: /CRP[:\s]*([\d.]+)/i,
     IL6: /IL[-\s]?6[:\s]*([\d.]+)/i,
     MDA: /MDA[:\s]*([\d.]+)/i,
@@ -12,23 +11,19 @@ function fallbackExtract(text) {
     TGFb1: /TGF[-\s]?b1[:\s]*([\d.]+)/i,
     SP: /\bSP\b[:\s]*([\d.]+)/i,
 
-    // ❤️ Lipids / Metabolic
     LDL: /LDL[:\s]*([\d.]+)/i,
     HDL: /HDL[:\s]*([\d.]+)/i,
     Triglycerides: /Triglycerides[:\s]*([\d.]+)/i,
     HbA1c: /HbA1c[:\s]*([\d.]+)/i,
 
-    // 💪 Muscle / Damage
     CKMM: /CK[-\s]?MM[:\s]*([\d.]+)/i,
     AldolaseA: /Aldolase[-\s]?A[:\s]*([\d.]+)/i,
     CTXII: /CTX[-\s]?II[:\s]*([\d.]+)/i,
 
-    // 🦴 Hormones / Bone
     PTH: /PTH[:\s]*([\d.]+)/i,
     VitaminD: /Vitamin\s?D[:\s]*([\d.]+)/i,
     Osteocalcin: /Osteocalcin[:\s]*([\d.]+)/i,
 
-    // 🧪 Kidney
     Creatinine: /Creatinine[:\s]*([\d.]+)/i,
     BUN: /BUN[:\s]*([\d.]+)/i,
     eGFR: /eGFR[:\s]*([\d.]+)/i
@@ -37,14 +32,23 @@ function fallbackExtract(text) {
   const result = {};
 
   for (const key in patterns) {
-    const match = text.match(patterns[key]);
+    try {
+      const match = text.match(patterns[key]);
 
-    if (match) {
-      result[key] = {
-        value: parseFloat(match[1]),
-        unit: "unknown",
-        fallback: true
-      };
+      if (match && match[1]) {
+        const value = parseFloat(match[1]);
+
+        if (!isNaN(value) && match[1].trim() !== "") {
+          result[key] = {
+            value,
+            unit: "unknown",
+            fallback: true
+          };
+        }
+      }
+
+    } catch (err) {
+      console.warn(`⚠️ Regex failed for ${key}`);
     }
   }
 

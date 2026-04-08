@@ -60,11 +60,41 @@ exports.submitPatient = async (req, res) => {
       age: safeAge
     };
 
+    function fixDetectedUnits(biomarkers) {
+      const defaults = {
+        CRP: "mg/L",
+        LDL: "mg/dL",
+        HDL: "mg/dL",
+        Triglycerides: "mg/dL",
+        VitaminD: "ng/mL",
+        Creatinine: "mg/dL"
+      };
+
+      const fixed = {};
+
+      for (const key in biomarkers) {
+        const biomarker = biomarkers[key];
+
+        if (biomarker.unit === "detected") {
+          fixed[key] = {
+            value: biomarker.value,
+            unit: defaults[key] || "unknown"
+          };
+        } else {
+          fixed[key] = biomarker;
+        }
+      }
+
+      return fixed;
+    }
+
+    const normalizedBiomarkers = fixDetectedUnits(biomarkerMap);
+
     // ================= ALGORITHM =================
     console.log("🧠 STEP 2: Running algorithm...");
 
     const result = runAlgorithm({
-      biomarkers: biomarkerMap,
+      biomarkers: normalizedBiomarkers,
       age: numericAge
     });
 

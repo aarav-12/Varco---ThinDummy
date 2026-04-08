@@ -2,28 +2,84 @@
 console.log("📊 reportAI.service loaded");
 
 const { callLLM } = require("./llm.service");
+const { fallbackExtract } = require("../utils/fallbackExtractor");
 
+// 🔍 VALIDATOR
+function isValidBiomarker(item) {
+  return (
+    item &&
+    typeof item.name === "string" &&
+    item.name.trim().length > 0 &&
+    typeof item.value === "number" &&
+    !isNaN(item.value)
+  );
+}
 
-// 🔥 MAIN FUNCTION — AI BIOMARKER EXTRACTION
+// 🔥 SAFE PARSER
+function safeParse(response) {
+  try {
+    let cleaned = response.trim();
+
+    const match = cleaned.match(/```json\s*([\s\S]*?)```/i);
+    if (match) cleaned = match[1].trim();
+
+    return JSON.parse(cleaned);
+
+  } catch (err) {
+    console.log("⚠️ JSON PARSE FAILED → attempting recovery");
+
+    try {
+      const match = response.match(/\{[\s\S]*\}/);
+      if (match) {
+        return JSON.parse(match[0]);
+      }
+    } catch {}
+
+    try {
+      const regex = /"name"\s*:\s*"([^"]+)"\s*,\s*"value"\s*:\s*([\d.]+)\s*,\s*"unit"\s*:\s*"([^"]*)"/g;
+
+      const biomarkers = [];
+      let m;
+
+      while ((m = regex.exec(response)) !== null) {
+        const value = parseFloat(m[2]);
+        if (!isNaN(value)) {
+          biomarkers.push({
+            name: m[1],
+            value,
+            unit: m[3]
+          });
+        }
+      }
+
+      if (biomarkers.length > 0) {
+        return { biomarkers };
+      }
+
+    } catch {}
+
+    return null;
+  }
+}
+
+// 🔥 MAIN FUNCTION
 async function extractBiomarkersFromText(text) {
 
-  // 🔹 PASS 1 — STRICT (real values only)
   const strictPrompt = [
     {
       role: "user",
       content: `
-Extract biomarker values from this medical report.
+Extract ALL biomarkers from this medical report.
 
-STRICT RULES:
-- Extract ONLY real lab values (mg/L, ng/mL, pg/mL, mg/dL, mL/min)
-- IGNORE Z-scores, charts, graphs
+STRICT:
+- Do NOT skip anything
 - Return ONLY JSON
-- No explanation
 
 FORMAT:
 {
-  "CRP": { "value": number, "unit": "mg/L" },
-  "IL6": { "value": number, "unit": "pg/mL" }
+  "biomarkers": [
+    { "name": "CRP", "value": 0.8, "unit": "mg/L" }
+  ]
 }
 
 REPORT:
@@ -32,90 +88,76 @@ ${text}
     }
   ];
 
+  // 🔥 CALL AI
   let response = await callLLM(strictPrompt);
   let parsed = safeParse(response);
 
-  // 🔥 FALLBACK IF STRICT FAILS
-  if (!parsed || Object.keys(parsed).length === 0) {
-    console.log("⚠️ STRICT FAILED → FALLBACK MODE");
+  console.log("🧪 RAW RESPONSE:", response);
+  console.log("🧪 PARSED INITIAL:", parsed);
 
-    const fallbackPrompt = [
-      {
-        role: "user",
-        content: `
-Extract ALL possible lab values from this medical report.
+  // 🔥 FORCE ARRAY FORMAT
+  if (parsed && !Array.isArray(parsed.biomarkers)) {
+    parsed = {
+      biomarkers: Object.entries(parsed).map(([name, val]) => ({
+        name,
+        value: val.value,
+        unit: val.unit || "unknown"
+      }))
+    };
+  }
 
-IMPORTANT:
-- Extract ANY numeric medical value you see
-- Do NOT worry about correctness
-- Do NOT skip values because of formatting
-- Tables, broken text, OCR - still extract
-- Even partial or uncertain values are OK
+  let finalMap = {};
 
-Return STRICT JSON ARRAY:
-[
-  { "name": "CRP", "value": 2.5, "unit": "mg/L" }
-]
+  // ✅ USE AI DATA (PRIMARY)
+  if (parsed?.biomarkers) {
+    parsed.biomarkers
+      .filter(isValidBiomarker)
+      .forEach(item => {
+        finalMap[item.name] = {
+          value: item.value,
+          unit: item.unit || "unknown"
+        };
+      });
+  }
 
-DO NOT return empty array unless absolutely nothing exists.
+  // 🔥 FALLBACK (ONLY ADD — NEVER REPLACE GOOD DATA)
+  const fallback = fallbackExtract(text);
 
-REPORT:
-${text}
-`
-      }
-    ];
-
-    response = await callLLM(fallbackPrompt);
-    parsed = safeParse(response);
-
-    // 🔥 convert array → object
-    if (Array.isArray(parsed)) {
-      const mapped = {};
-      for (const item of parsed) {
-        if (item.name && item.value !== undefined) {
-          mapped[item.name] = {
-            value: item.value,
-            unit: item.unit || "unknown"
-          };
-        }
-      }
-      parsed = mapped;
+  for (const key in fallback) {
+    if (!finalMap[key] || finalMap[key].unit === "unknown") {
+      console.log("🛠️ FALLBACK ADDED:", key);
+      finalMap[key] = fallback[key];
     }
   }
 
-  if (!parsed || Object.keys(parsed).length === 0) {
-    throw new Error("AI could not extract biomarkers");
-  }
-
-  console.log("✅ Extracted Biomarkers:", parsed);
-
-  return parsed;
-}
-
-
-// 🔥 SAFE JSON PARSER (handles markdown + bad output)
-function safeParse(response) {
-  try {
-    let cleaned = response.trim();
-
-    // remove markdown wrapping
-    if (cleaned.startsWith("```")) {
-      cleaned = cleaned
-        .replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
+  // 🔥 CLEAN (remove z-score junk)
+  const cleaned = {};
+  for (const key in finalMap) {
+    const unit = finalMap[key].unit?.toLowerCase() || "";
+    if (!unit.includes("z")) {
+      cleaned[key] = finalMap[key];
     }
-
-    return JSON.parse(cleaned);
-
-  } catch (err) {
-    console.error("❌ PARSE FAIL:", response);
-    return null;
   }
+
+  // 🔥 JUST WARN — DO NOT RETRY OR OVERRIDE
+  const CRITICAL = ["IL6", "MDA", "VEGF"];
+  CRITICAL.forEach(k => {
+    if (!cleaned[k]) {
+      console.warn("⚠️ MISSING:", k);
+    }
+  });
+
+  if (!cleaned || Object.keys(cleaned).length === 0) {
+    throw new Error("No valid biomarkers extracted");
+  }
+
+  console.log("📊 FINAL COUNT:", Object.keys(cleaned).length);
+  console.log("✅ FINAL EXTRACTED BIOMARKERS:", cleaned);
+
+  return cleaned;
 }
 
-
-// 🔥 REPORT GENERATION (POST ENGINE)
+// 🔥 REPORT GENERATION
 function generateReport({
   biologicalAge,
   chronologicalAge,
@@ -123,7 +165,6 @@ function generateReport({
   biomarkers,
   severity
 }) {
-
   const biomarkerBreakdown = Object.keys(biomarkers).map(key => ({
     name: key,
     score: biomarkers[key],
@@ -133,34 +174,20 @@ function generateReport({
   let summary;
 
   if (deviation >= 3) {
-    summary = `Biological age is elevated by ${deviation} years, indicating significant biomarker stress.`;
+    summary = `Biological age is elevated by ${deviation} years.`;
   } else if (deviation >= 1) {
-    summary = `Biological age is slightly elevated by ${deviation} year(s). Moderate imbalance detected.`;
+    summary = `Biological age slightly elevated by ${deviation}.`;
   } else {
-    summary = `Biological age aligns with chronological age. Biomarkers are stable.`;
-  }
-
-  const recommendations = [];
-
-  if (deviation >= 3) {
-    recommendations.push("Consult a medical professional.");
-    recommendations.push("Adopt corrective lifestyle interventions.");
-  } else if (deviation >= 1) {
-    recommendations.push("Improve sleep and physical activity.");
-    recommendations.push("Monitor biomarkers regularly.");
-  } else {
-    recommendations.push("Maintain current lifestyle habits.");
+    summary = `Biological age aligned with chronological age.`;
   }
 
   return {
     summary,
     biomarkerBreakdown,
-    recommendations
+    recommendations: []
   };
 }
 
-
-// ✅ FINAL EXPORT
 module.exports = {
   extractBiomarkersFromText,
   generateReport

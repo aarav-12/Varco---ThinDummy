@@ -1,30 +1,22 @@
 // utils/unitConversion.js
 
 // 🔥 normalize ALL units to a standard comparable format
-function normalizeUnit(unit) {
-  if (!unit) return "";
+function normalizeUnit(name, value, unit) {
+  const normalizedName = String(name || "").toLowerCase();
+  value = Number(value);
 
-  return unit
-    .toLowerCase()
-    .replace(/[µμ]/g, "u")      // µ, μ → u
-    .replace(/\s/g, "")         // remove spaces
-    .replace("/1.73m2", "")     // eGFR fix
-    .replace("per", "/");       // optional normalization
-}
-
-
-// 🔥 conversions (only when truly different scales)
-const UNIT_CONVERSIONS = {
-  MDA: {
-    "ng/ml": (v) => v * 0.0357 // ng/mL → µmol/L
-  },
-  CKMM: {
-    "ng/ml": (v) => v * 0.01
-  },
-  AldolaseA: {
-    "ng/ml": (v) => v * 0.1
+  // 🔥 FIX 1 — Aldolase (CRITICAL)
+  if ((name === "AldolaseA" || normalizedName === "aldolasea") && unit === "ng/mL") {
+    return { value: value * 0.1, unit: "U/L" };
   }
-};
+
+  // 🔥 FIX 2 — CKMM
+  if ((name === "CKMM" || normalizedName === "ckmm") && unit === "ng/mL") {
+    return { value: value * 10, unit: "U/L" };
+  }
+
+  return { value, unit };
+}
 
 
 function applyUnitConversion(biomarkers, reference) {
@@ -42,48 +34,52 @@ function applyUnitConversion(biomarkers, reference) {
     const expectedUnitRaw = ref.unit;
     const incomingUnitRaw = unit;
 
-    const expectedUnit = normalizeUnit(expectedUnitRaw);
-    const incomingUnit = normalizeUnit(incomingUnitRaw);
+    const normalized = normalizeUnit(key, value, incomingUnitRaw);
+    const normalizedValue = normalized.value;
+    const normalizedUnitRaw = normalized.unit;
+
+    const expectedUnit = normalizeUnit(key, value, expectedUnitRaw).unit
+      ? normalizeUnit(key, value, expectedUnitRaw).unit.toLowerCase().replace(/[µμ]/g, "u").replace(/\s/g, "").replace("/1.73m2", "").replace("per", "/")
+      : "";
+    const incomingUnit = normalizeUnit(key, normalizedValue, normalizedUnitRaw).unit
+      ? normalizeUnit(key, normalizedValue, normalizedUnitRaw).unit.toLowerCase().replace(/[µμ]/g, "u").replace(/\s/g, "").replace("/1.73m2", "").replace("per", "/")
+      : "";
 
     // ✅ SAME UNIT (after normalization)
     if (expectedUnit === incomingUnit) {
       converted[key] = {
-        value,
+        value: normalizedValue,
         unit: expectedUnitRaw // keep original formatting
       };
       continue;
     }
 
     // 🔥 TRY CONVERSION (using normalized keys)
-    const converter = UNIT_CONVERSIONS[key]?.[incomingUnit];
-
-    if (converter) {
-      const newValue = converter(value);
-
+    if (normalizedUnitRaw !== incomingUnitRaw) {
       conversionLog.push({
         name: key,
         from: incomingUnitRaw,
-        to: expectedUnitRaw,
+        to: normalizedUnitRaw,
         original: value,
-        converted: Number(newValue.toFixed(3))
+        converted: Number(normalizedValue.toFixed(3))
       });
 
       converted[key] = {
-        value: newValue,
-        unit: expectedUnitRaw
+        value: normalizedValue,
+        unit: normalizedUnitRaw
       };
 
-    } else {
-
-      // ❌ REJECT ONLY IF TRULY INCOMPATIBLE
-      rejected.push({
-        name: key,
-        reason: `Unsupported unit: ${incomingUnitRaw}, expected: ${expectedUnitRaw}`
-      });
+      continue;
     }
+
+    // ❌ REJECT ONLY IF TRULY INCOMPATIBLE
+    rejected.push({
+      name: key,
+      reason: `Unsupported unit: ${incomingUnitRaw}, expected: ${expectedUnitRaw}`
+    });
   }
 
   return { converted, conversionLog, rejected };
 }
 
-module.exports = { applyUnitConversion };
+module.exports = { applyUnitConversion, normalizeUnit };

@@ -9,9 +9,8 @@ const {
 
 const { normalizeUnits } = require("../services/biomarkerSanitizer");
 const { mapBiomarkers } = require("../utils/biomarkerMapper");
-const { adaptBiomarkerInput } = require("../utils/biomarkerInputAdapter");
+const { buildBiomarkerMap } = require("../utils/biomarkerInputAdapter");
 const { applyUnitConversion } = require("../utils/unitConversion");
-const { inferMissingBiomarkers } = require("../services/fallbackInference");
 
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
@@ -65,25 +64,31 @@ const calculateBiologicalAgeController = async (req, res) => {
     const { biomarkers: rawBiomarkers, age, patientId } = req.body;
 
     // ✅ STEP 1 — ADAPT
-    const biomarkers = adaptBiomarkerInput(rawBiomarkers);
+    const biomarkersArray = Array.isArray(rawBiomarkers)
+      ? rawBiomarkers
+      : Object.keys(rawBiomarkers).map(name => ({
+          name,
+          value: rawBiomarkers[name]?.value,
+          unit: rawBiomarkers[name]?.unit
+        }));
+
+    const biomarkers = buildBiomarkerMap(biomarkersArray);
 
     // ✅ STEP 2 — MAP
     const { mapped: mappedBiomarkers, rejected: mappingRejected } = mapBiomarkers(biomarkers);
 
-    // ✅ STEP 3 — INFERENCE
-    const inferred = inferMissingBiomarkers(mappedBiomarkers);
+    if (Object.keys(mappedBiomarkers).length === 0) {
+      return res.status(200).json({
+        success: false,
+        type: "INVALID_REPORT_TYPE",
+        message: "This appears to be a processed health report. Please upload a raw lab report with actual biomarker values."
+      });
+    }
 
-    console.log("🧠 INFERRED:", inferred);
-
-    const enrichedBiomarkers = {
-      ...inferred,
-      ...mappedBiomarkers
-    };
-
-    console.log("📦 FINAL INPUT:", enrichedBiomarkers);
+    console.log("📦 FINAL INPUT:", mappedBiomarkers);
 
     // ✅ STEP 4 — NORMALIZE
-    const normalizedBiomarkers = normalizeUnits(enrichedBiomarkers);
+    const normalizedBiomarkers = normalizeUnits(mappedBiomarkers);
 
     // ✅ STEP 5 — UNIT CONVERSION
     const {

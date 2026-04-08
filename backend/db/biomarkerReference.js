@@ -45,4 +45,6 @@ const biomarkerReference = {
 
 };
 
-module.exports = biomarkerReference;
+module.exports = {
+  ...biomarkerReference
+};

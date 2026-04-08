@@ -1,9 +1,17 @@
 // utils/biomarkerMapper.js
 
+// 🔥 MASTER ALIAS MAP (CANONICAL → ALL VARIANTS)
 const aliasMap = {
 
   // 🧪 CORE
-  CRP: ["crp", "hscrp", "hs-crp", "hs crp", "creactiveprotein"],
+  CRP: [
+  "crp",
+  "hscrp",
+  "hs-crp",
+  "creactiveprotein",
+  "creactiveproteincrp",
+  "c reactive protein"
+],
 
   HbA1c: ["hba1c", "hba1c%", "hb a1c", "glycatedhemoglobin"],
 
@@ -12,7 +20,8 @@ const aliasMap = {
     "fastingglucose",
     "fasting blood glucose",
     "fasting sugar",
-    "fbs"
+    "fbs",
+    "averagebloodglucose"
   ],
 
   // 🧬 OXIDATIVE / INFLAMMATION
@@ -27,7 +36,8 @@ const aliasMap = {
     "cpktotal",
     "creatinekinase",
     "ckmm",
-    "ck-mm"
+    "ck-mm",
+    "creatinekinasemm"
   ],
 
   AldolaseA: ["aldolase", "aldolasea"],
@@ -36,7 +46,14 @@ const aliasMap = {
   LDL: ["ldl", "ldlcholesterol"],
   HDL: ["hdl", "hdlcholesterol"],
   Triglycerides: ["triglycerides", "tg"],
-  TotalCholesterol: ["totalcholesterol", "total cholesterol"],
+  TotalCholesterol: [
+    "totalcholesterol",
+    "total cholesterol",
+    "serumcholesterol"
+  ],
+
+  VLDL: ["vldl"],
+  NonHDL: ["nonhdlcholesterol", "non hdl cholesterol"],
 
   // 🧠 GENERAL BLOOD
   Hemoglobin: ["hemoglobin", "hb", "hgb"],
@@ -46,19 +63,37 @@ const aliasMap = {
 
   // 🧪 KIDNEY
   Creatinine: ["creatinine", "serumcreatinine"],
-  BUN: ["bun", "bloodureanitrogen"],
+  BUN: [
+  "bun",
+  "bloodureanitrogen",
+  "bloodureanitrogenbun",
+  "blood urea nitrogen"
+],
   eGFR: ["egfr"],
 
   // 🦴 BONE / HORMONAL
-  VitaminD: ["vitamind", "vit d", "vitamin d"],
-  Calcium: ["calcium", "serumcalcium", "s.calcium"],
+  VitaminD: [
+  "vitamind",
+  "vitamin d",
+  "vit d",
+  "25hydroxyvitamind",
+  "25 hydroxy vitamin d",
+  "25-hydroxy vitamin d"
+],
+Phosphorus: [
+  "phosphorus",
+  "seruminorganicphosphorus"
+],
+
+  Calcium: ["calcium", "serumcalcium", "s.calcium", "serumtotalcalcium"],
+
   PTH: ["pth"],
   Osteocalcin: ["osteocalcin"],
 
   // 🧠 NEURO
   BDNF: ["bdnf"],
 
-  // ⚠️ OPTIONAL / FUTURE
+  // ⚠️ OPTIONAL
   ESR: ["esr", "erythrocytesedimentationrate"],
   ALT: ["sgpt", "alt"],
   AST: ["sgot", "ast"],
@@ -67,25 +102,10 @@ const aliasMap = {
   Albumin: ["albumin"],
   Globulin: ["globulin"],
 
-  // 🔥 FIXED (Unicode + normalization safe)
-  TGFb1: [
-    "tgfb1",
-    "tgf-b1",
-    "tgfβ1",
-    "tgf-β1",
-    "tgf1"     // ⭐ critical after normalization
-  ],
-
-  // 🔥 NEW (correct biomarker)
-  MMP9: [
-    "mmp9",
-    "mmp-9"
-  ],
-
-  // (keep old if needed)
+  // 🔥 ADVANCED
+  TGFb1: ["tgfb1", "tgf-b1", "tgfβ1", "tgf-β1", "tgf1"],
+  MMP9: ["mmp9", "mmp-9"],
   MMP3: ["mmp3", "mmp-3"],
-
-  // 🦴 ADVANCED / EDGE
   CTXII: ["ctxii", "ctx-ii"],
   COMP: ["comp"],
 
@@ -95,14 +115,17 @@ const aliasMap = {
   // 🧠 SIGNALING
   VEGF: ["vegf"],
 
-  // 🧪 UNKNOWN SHORT FORMS
+  // 🧪 SHORT FORMS
   SP: ["sp"]
 };
 
 
-// 🔧 NORMALIZE FUNCTION
+// 🔧 NORMALIZATION
 function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return name
+    .toLowerCase()
+    .replace(/_/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 
@@ -114,59 +137,69 @@ function mapBiomarkers(inputBiomarkers) {
   for (const key in inputBiomarkers) {
 
     const clean = normalizeName(key);
+    console.log("🔍 CHECK:", key, "→", clean);
+
     let found = null;
 
     for (const canonical in aliasMap) {
+      const normalizedAliases = aliasMap[canonical].map(a =>
+        normalizeName(a)
+      );
 
-      const aliases = aliasMap[canonical].map(normalizeName);
-
-      if (aliases.includes(clean)) {
+      if (normalizedAliases.includes(clean)) {
         found = canonical;
         break;
       }
     }
 
-    if (found) {
+    const biomarker = inputBiomarkers[key];
 
-      const biomarker = inputBiomarkers[key];
-
-      // ✅ VALIDATE STRUCTURE
-      if (!biomarker) {
-  rejected.push({ name: key, reason: "Missing biomarker object" });
-  continue;
-}
-
-// 🔥 AUTO-FIX MISSING STRUCTURE
-if (typeof biomarker.value !== "number") {
-  console.log("⚠️ FIXING VALUE:", key);
-  biomarker.value = parseFloat(biomarker.value) || 0;
-}
-
-if (!biomarker.unit) {
-  console.log("⚠️ MISSING UNIT:", key);
-  biomarker.unit = "unknown";
-}
-
-      // ✅ PREVENT DUPLICATE OVERRIDE
-      if (!mapped[found]) {
-        mapped[found] = biomarker;
-      } else {
-        console.log(`⚠️ DUPLICATE BIOMARKER IGNORED: ${key} → ${found}`);
-      }
-
-    } else {
+    if (!found) {
+      console.warn("🚨 DROPPED BIOMARKER:", key);
 
       rejected.push({
         name: key,
         reason: "No mapping found"
       });
 
-      console.log("⚠️ UNKNOWN BIOMARKER:", key);
+      continue;
+    }
+
+    // 🔥 STRUCTURE FIX
+    if (!biomarker || typeof biomarker !== "object") {
+      rejected.push({ name: key, reason: "Invalid structure" });
+      continue;
+    }
+
+    let value = biomarker.value;
+    let unit = biomarker.unit || "unknown";
+
+    value = parseFloat(value);
+
+    if (isNaN(value)) {
+      rejected.push({ name: key, reason: "Invalid numeric value" });
+      continue;
+    }
+
+    // 🔥 UNIT NORMALIZATION
+    if (unit.toLowerCase() === "mg/dl") unit = "mg/dL";
+
+    // 🔥 PRIORITY LOGIC (AI > fallback)
+    if (!mapped[found]) {
+      mapped[found] = { value, unit };
+    } else {
+      const existing = mapped[found];
+
+      // prefer non-unknown unit
+      if (existing.unit === "unknown" && unit !== "unknown") {
+        mapped[found] = { value, unit };
+      } else {
+        console.log(`⚠️ DUPLICATE IGNORED: ${key} → ${found}`);
+      }
     }
   }
 
   return { mapped, rejected };
 }
 
-
-module.exports = { mapBiomarkers };
+module.exports = { mapBiomarkers, normalizeName };

@@ -1,42 +1,39 @@
-// utils/biomarkerInputAdapter.js
+const { normalizeName } = require("./biomarkerMapper");
+const { normalizeUnit } = require("./unitConversion");
+const biomarkerReference = require("../db/biomarkerReference");
 
-function normalizeName(name) {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+function buildBiomarkerMap(array) {
+  const map = {};
+
+  array.forEach(b => {
+    const name = normalizeName(b.name);
+
+    if (!name) return;
+
+    // ✅ THIS LINE IS THE FIX
+    let { value, unit } = normalizeUnit(
+      name,
+      b.value,
+      b.unit
+    );
+
+    // no more "detected" units
+    if (unit === "detected") {
+      unit = biomarkerReference[name]?.unit || "unknown";
+    }
+
+    // 🚨 SANITY FILTERS
+    if ((name === "LDL" || name === "ldl") && value < 30) {
+      console.log("⚠️ Rejecting invalid LDL:", value);
+      return; // skip wrong LDL
+    }
+
+    if (isNaN(value)) return;
+
+    map[name] = { value, unit };
+  });
+
+  return map;
 }
 
-function adaptBiomarkerInput(input) {
-
-  // If already object → return as is
-  if (!Array.isArray(input)) return input;
-
-  const adapted = {};
-  const seen = {};
-
-  for (const item of input) {
-
-    if (!item.name || item.value == null) continue;
-
-    const clean = normalizeName(item.name);
-
-    // store latest occurrence
-    seen[clean] = {
-      originalName: item.name,
-      value: item.value,
-      unit: item.unit || ""
-    };
-  }
-
-  // rebuild final object (last wins)
-  for (const key in seen) {
-    const entry = seen[key];
-
-    adapted[entry.originalName] = {
-      value: entry.value,
-      unit: entry.unit
-    };
-  }
-
-  return adapted;
-}
-
-module.exports = { adaptBiomarkerInput };
+module.exports = { buildBiomarkerMap };
