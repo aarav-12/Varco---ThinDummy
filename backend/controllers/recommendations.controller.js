@@ -1,16 +1,14 @@
 const pool = require("../db");
 
 
-// -----------------------------
 // GET RECOMMENDATIONS
-// -----------------------------
 const getRecommendations = async (req, res) => {
   try {
     const { patientId } = req.params;
 
     console.log("PATIENT ID RECEIVED:", patientId);
 
-    // ✅ UUID validation (correct way)
+    // ✅ UUID validation
     const uuidRegex = /^[0-9a-fA-F-]{36}$/;
 
     if (!patientId || !uuidRegex.test(patientId)) {
@@ -21,7 +19,7 @@ const getRecommendations = async (req, res) => {
 
     const result = await pool.query(
       `SELECT domain, recommendation, updated_at
-       FROM patient_recommendations
+       FROM recommendations
        WHERE patient_id = $1`,
       [patientId]
     );
@@ -34,22 +32,23 @@ const getRecommendations = async (req, res) => {
   } catch (error) {
     console.error("GET RECOMMENDATIONS ERROR:", error);
     return res.status(500).json({
-      error: "Failed to fetch recommendations"
+      error: "Failed to fetch recommendations",
+      details: error.message
     });
   }
 };
 
 
 
-// -----------------------------
 // UPSERT RECOMMENDATION
-// -----------------------------
 const upsertRecommendation = async (req, res) => {
   try {
     const { patientId } = req.params;
     const { domain, recommendation } = req.body;
 
     console.log("UPSERT FOR:", patientId);
+    console.log("DOMAIN:", domain);
+    console.log("RECOMMENDATION:", recommendation);
 
     // ✅ UUID validation
     const uuidRegex = /^[0-9a-fA-F-]{36}$/;
@@ -67,7 +66,7 @@ const upsertRecommendation = async (req, res) => {
     }
 
     const result = await pool.query(
-      `INSERT INTO patient_recommendations 
+      `INSERT INTO recommendations 
        (patient_id, domain, recommendation, updated_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (patient_id, domain)
@@ -86,7 +85,8 @@ const upsertRecommendation = async (req, res) => {
   } catch (error) {
     console.error("UPSERT RECOMMENDATION ERROR:", error);
     return res.status(500).json({
-      error: "Failed to save recommendation"
+      error: "Failed to save recommendation",
+      details: error.message
     });
   }
 };
