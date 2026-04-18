@@ -104,9 +104,11 @@ const uploadReport = async (req, res) => {
     }
 
     // 🔥 STEP 5 — RUN ALGORITHM (DIRECT CALL)
+    const age = Number(req.body.age) || 60;
+
     const result = runAlgorithm({
       biomarkers: map,
-      age: 60
+      age: age
     });
 
     // 🔥 STEP 6 — MISSING BIOMARKERS
