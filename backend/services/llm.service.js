@@ -5,6 +5,8 @@ require("dotenv").config();
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
+const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
+
 const callLLM = async (messages) => {
   try {
     console.log("🔑 Claude Key:", process.env.CLAUDE_API_KEY?.slice(0, 10));
@@ -23,7 +25,7 @@ const callLLM = async (messages) => {
           "content-type": "application/json"
         },
         body: JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: MODEL,
           max_tokens: 500,
 
           // ✅ SYSTEM CONTROL (IMPORTANT)
@@ -51,8 +53,11 @@ Strict rules:
         })
       }
     );
+    console.log("MODEL USED:", MODEL);
+    
 
     const data = await response.json();
+    console.log("🧠 FULL CLAUDE RESPONSE:", data);
 
     if (!response.ok) {
       console.error("❌ Claude API Error:", data);
