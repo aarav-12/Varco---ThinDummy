@@ -128,8 +128,24 @@ const uploadReport = async (req, res) => {
     if (map.CRP?.value > 1)
       topFixes.push("Reduce inflammation");
 
-    // 🔥 STEP 8 — FINAL RESPONSE (LOCKED FORMAT)
+    // 🔥 STEP 8 — FINAL RESPONSE (DUAL FORMAT SAFE)
+
+    const biomarkerArray = Object.keys(map).map((key, i) => ({
+      id: `parsed-b${i + 1}`,
+      name: key,
+      value: map[key].value,
+      unit: map[key].unit,
+      normalRange: "",
+      min: 0,
+      max: 100,
+      status: "normal",
+      trend: "stable",
+      description: "",
+      category: "General"
+    }));
+
     return res.json({
+      // ✅ KEEP YOUR ORIGINAL SYSTEM (UNCHANGED)
       success: true,
       data: {
         biologicalAge: result.biologicalAge ?? null,
@@ -143,7 +159,15 @@ const uploadReport = async (req, res) => {
 
         domainScores: result.domainScores ?? {},
         algorithmVersion: "3.0"
-      }
+      },
+
+      // ✅ ADD LOVABLE FORMAT (NEW)
+      patient: {
+        name: "Unknown",
+        age: 60,
+        gender: "unknown"
+      },
+      biomarkers: biomarkerArray
     });
 
   } catch (err) {

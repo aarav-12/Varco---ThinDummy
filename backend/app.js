@@ -18,17 +18,22 @@ const adminRoutes = require("./routes/admin.routes");
 
 /* MIDDLEWARE */
 app.use(cors({
-  origin: "*", // or your frontend domain later
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  origin: [
+    "http://localhost:5173",
+    "https://predict.fit",
+    "https://www.predict.fit",
+    /\.lovable\.app$/,
+    /\.lovableproject\.com$/
+  ],
+  methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
-    "Authorization",
-    "apikey",
-    "x-client-info"
+    "Authorization"
   ]
 }));
 app.options(/.*/, cors());
-app.use(express.json());
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ limit: "25mb", extended: true }));
 
 app.use("/api/report", reportRoutes);
 /* LOGGER (put AFTER middleware, BEFORE routes is also fine) */
