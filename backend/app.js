@@ -3,6 +3,7 @@
 
 const express = require("express");
 const cors = require("cors");
+const { callLLM } = require("./services/llm.service");
 
 const app = express();
 
@@ -34,6 +35,30 @@ app.use(cors({
 app.options(/.*/, cors());
 app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ limit: "25mb", extended: true }));
+
+// 🔥 ADD HERE
+app.post("/api/chat", async (req, res) => {
+  try {
+    const messages = Array.isArray(req.body?.messages) ? req.body.messages : [];
+
+    const clean = messages
+      .filter((m) => m && (m.role === "user" || m.role === "assistant") && m.content)
+      .map((m) => ({ role: m.role, content: String(m.content) }));
+
+    if (clean.length === 0) {
+      return res.status(400).json({ error: "No messages provided" });
+    }
+
+    const reply = await callLLM(clean);
+    res.json({ reply });
+
+  } catch (e) {
+    console.error("/api/chat error:", e);
+    res.status(500).json({ error: e.message || "Unknown error" });
+  }
+});
+
+console.log("✅ /api/chat route registered");
 
 app.use("/api/report", reportRoutes);
 /* LOGGER (put AFTER middleware, BEFORE routes is also fine) */
