@@ -1,5 +1,5 @@
 const { extractTextFromPDF } = require("../services/pdfParser");
-const { extractBiomarkersFromText } = require("../services/reportAI.service");
+const { extractBiomarkersFromText, mergeBiomarkers } = require("../services/reportAI.service");
 const { fallbackExtract } = require("../services/ruleExtractor");
 const { runAlgorithm } = require("../services/algorithm.service"); // 🔥 IMPORTANT
 
@@ -64,24 +64,23 @@ const uploadReport = async (req, res) => {
     console.log("🧩 RULE BIOMARKERS:", ruleBiomarkers);
 
     // 🔹 STEP 3 — AI
-    let parsed = null;
+    let extracted = [];
 
     try {
-      parsed = await extractBiomarkersFromText(text);
+      extracted = await extractBiomarkersFromText(text);
     } catch (e) {
       console.log("⚠️ AI extraction failed, continuing...");
     }
 
+    const finalBiomarkers = mergeBiomarkers(extracted);
+    console.log("✅ FINAL COUNT:", finalBiomarkers.length);
+
     // 🔹 STEP 4 — PICK SOURCE
     let rawArray;
 
-    if (parsed && Object.keys(parsed).length > 0) {
+    if (finalBiomarkers.length > 0) {
       console.log("✅ USING AI DATA");
-      rawArray = Object.keys(parsed).map(key => ({
-        name: key,
-        value: parsed[key].value,
-        unit: parsed[key].unit
-      }));
+      rawArray = finalBiomarkers;
     } else {
       console.log("⚠️ USING RULE-BASED FALLBACK");
       rawArray = ruleToArray(ruleBiomarkers);
