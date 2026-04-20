@@ -20,6 +20,19 @@ function mergeBiomarkers(biomarkersArray) {
   return Object.values(map);
 }
 
+async function callWithRetry(messages, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await callLLM(messages, "extract");
+    } catch (err) {
+      console.log("⚠️ Retry:", i + 1);
+      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+  }
+
+  return null;
+}
+
 // 🔥 MAIN FUNCTION
 async function extractBiomarkersFromText(fullText) {
   const chunks = chunkText(fullText, 6000);
@@ -30,10 +43,14 @@ async function extractBiomarkersFromText(fullText) {
 
   for (const chunk of chunks) {
     try {
-      const response = await callLLM(
+      const response = await callWithRetry(
         [{ role: "user", content: chunk }],
-        "extract"
       );
+
+      if (!response) {
+        console.log("❌ Skipping chunk permanently");
+        continue;
+      }
 
       let cleaned = response
         .replace(/```json|```/g, "")
@@ -44,10 +61,14 @@ async function extractBiomarkersFromText(fullText) {
       if (parsed.biomarkers) {
         allBiomarkers.push(...parsed.biomarkers);
       }
+
+      await new Promise(r => setTimeout(r, 700));
     } catch (err) {
       console.log("❌ Chunk parse failed, skipping...");
     }
   }
+
+  console.log("🧪 TOTAL BIOMARKERS:", allBiomarkers.length);
 
   return allBiomarkers;
 }

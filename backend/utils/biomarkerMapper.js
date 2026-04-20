@@ -26,7 +26,7 @@ const aliasMap = {
 
   // 🧬 OXIDATIVE / INFLAMMATION
   MDA: ["mda"],
-  IL6: ["il6", "il-6"],
+  IL6: ["il6", "il-6", "interleukin6"],
 
   // 💪 MUSCLE
   CKMM: [
@@ -87,7 +87,7 @@ Phosphorus: [
 
   Calcium: ["calcium", "serumcalcium", "s.calcium", "serumtotalcalcium"],
 
-  PTH: ["pth"],
+  PTH: ["pth", "ipth", "intactpth"],
   Osteocalcin: ["osteocalcin"],
 
   // 🧠 NEURO
@@ -104,16 +104,27 @@ Phosphorus: [
 
   // 🔥 ADVANCED
   TGFb1: ["tgfb1", "tgf-b1", "tgfβ1", "tgf-β1", "tgf1"],
-  MMP9: ["mmp9", "mmp-9"],
+  MMP9: ["mmp9", "mmp-9", "matrixmetalloproteinase9"],
   MMP3: ["mmp3", "mmp-3"],
-  CTXII: ["ctxii", "ctx-ii"],
+  CTXII: [
+  "ctxii",
+  "ctx-ii",
+  "crosslinkedctelopeptide",
+  "crosslinkedctelopeptideoftypeiicollagen"
+],
   COMP: ["comp"],
 
   // 🧪 RATIOS
   CaPRatio: ["capratio", "calciumphosphorusratio"],
 
   // 🧠 SIGNALING
-  VEGF: ["vegf"],
+ VEGF: [
+  "vegf",
+  "vegfa",
+  "vegf-a",
+  "vascularendothelialgrowthfactor",
+  "vascularendothelialcellgrowthfactora"
+],
 
   // 🧪 SHORT FORMS
   SP: ["sp"]
@@ -154,7 +165,6 @@ function mapBiomarkers(inputBiomarkers) {
 
       if (
         normalizedAliases.includes(clean) ||
-        normalizedAliases.some(a => clean === a) ||   // exact alias match only
         normalizedAliases.some(a => clean.startsWith(a)) ||
         normalizedAliases.some(a => a.startsWith(clean))
       ) {
