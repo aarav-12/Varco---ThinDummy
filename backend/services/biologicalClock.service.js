@@ -1,4 +1,6 @@
 
+const biomarkerReference = require("../db/biomarkerReference");
+
 // Z SCORE CALCULATION
 
 function calculateZScore(value, mean, sd) {
@@ -226,6 +228,21 @@ function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights
 
   const confidence = calculateConfidence(patientBiomarkers, referenceData);
 
+  // 🔥 GROUP BIOMARKERS BY DOMAIN (SAFE ADDITION)
+  const biomarkersByDomain = {};
+
+  for (const key in zScores) {
+    const domain = biomarkerReference[key]?.domain;
+
+    if (!domain) continue;
+
+    if (!biomarkersByDomain[domain]) {
+      biomarkersByDomain[domain] = [];
+    }
+
+    biomarkersByDomain[domain].push(key);
+  }
+
   return {
     biomarkers: patientBiomarkers,
     zScores,
@@ -234,7 +251,8 @@ function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights
     compositeScore,
     deltaAge: ageResults.deltaAge,
     biologicalAge: ageResults.biologicalAge,
-    confidence
+    confidence,
+    biomarkersByDomain
   };
 }
 
