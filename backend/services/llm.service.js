@@ -1,5 +1,3 @@
-/* eslint-disable no-undef */
-
 require("dotenv").config();
 
 const fetch = (...args) =>
@@ -8,10 +6,9 @@ const fetch = (...args) =>
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
 
 /**
- * 🔥 UNIVERSAL LLM CALLER
  * mode:
- * - "chat" (default)
- * - "extract" (for PDF biomarker extraction)
+ * - "extract" → for PDF biomarker parsing
+ * - "chat" → for chatbot responses
  */
 const callLLM = async (messages, mode = "chat") => {
   try {
@@ -25,45 +22,40 @@ const callLLM = async (messages, mode = "chat") => {
     // 🔥 MODE SWITCH
     if (mode === "extract") {
       systemPrompt = `
-You are a medical data extraction engine.
+You are a medical report parser.
+
+Return ONLY valid JSON.
 
 STRICT RULES:
-- Extract biomarkers EXACTLY as written in the document
-- DO NOT rename biomarkers
-- DO NOT summarize
-- DO NOT explain anything
+- No markdown
+- No explanation
+- No extra text
+- Do NOT wrap in \`\`\`
+- Do NOT truncate
+- Always include value + unit
+- Skip biomarker if value or unit missing
 
-OUTPUT FORMAT (STRICT JSON):
+FORMAT:
 {
   "biomarkers": [
-    { "name": string, "value": number, "unit": string }
+    { "name": "HbA1c", "value": 7.0, "unit": "%" }
   ]
 }
-
-CRITICAL:
-- Preserve exact names
-- Preserve exact units
-- Extract only numeric values
-- If unsure, SKIP the biomarker
-
-NO markdown
-NO extra text
-ONLY JSON
 `;
-      maxTokens = 2000; //  keep this
+      maxTokens = 2000;
     } else {
       // 💬 CHAT MODE
       systemPrompt = `
 You are Predict Health AI, a concise health assistant.
 
-RESPONSE RULES:
-- Maximum 3-4 sentences
-- Plain text only (no markdown, no bullets)
+RULES:
+- Max 3-4 sentences
 - Conversational tone
-- No unnecessary disclaimers
+- No markdown
+- No bullet points
 - Answer directly
 `;
-      maxTokens = 300; //  clean and correct
+      maxTokens = 300;
     }
 
     const response = await fetch(
@@ -78,6 +70,7 @@ RESPONSE RULES:
         body: JSON.stringify({
           model: MODEL,
           max_tokens: maxTokens,
+          temperature: 0,
           system: [
             {
               type: "text",
@@ -91,9 +84,6 @@ RESPONSE RULES:
 
     const data = await response.json();
 
-    console.log("🧠 MODEL USED:", MODEL);
-    console.log("🧠 LLM RESPONSE:", JSON.stringify(data).slice(0, 500));
-
     if (!response.ok) {
       console.error("❌ Claude API Error:", data);
       throw new Error(data.error?.message || "Claude request failed");
@@ -103,12 +93,19 @@ RESPONSE RULES:
       throw new Error("Invalid Claude response structure");
     }
 
-    return data.content[0].text.trim();
+    let output = data.content[0].text.trim();
+
+    // 🔥 CLEAN ONLY FOR EXTRACT MODE
+    if (mode === "extract") {
+      output = output.replace(/```json|```/g, "").trim();
+    }
+
+    return output;
 
   } catch (error) {
-    console.error("🔥 LLM ERROR:", error.message);
+    console.error("🔥 CLAUDE ERROR:", error.message);
 
-    // 🔒 SAFE FALLBACK
+    // 🔒 SAFE FALLBACKS
     if (mode === "extract") {
       return JSON.stringify({ biomarkers: [] });
     }
