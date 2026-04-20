@@ -1,79 +1,99 @@
-/* eslint-disable no-undef */
-
 require("dotenv").config();
 
 const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
+import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 const MODEL = process.env.CLAUDE_MODEL || "claude-sonnet-4-6";
 
 const callLLM = async (messages) => {
-  try {
-    console.log("🔑 Claude Key:", process.env.CLAUDE_API_KEY?.slice(0, 10));
+try {
+console.log("🔑 Claude Key:", process.env.CLAUDE_API_KEY?.slice(0, 10));
 
-    if (!process.env.CLAUDE_API_KEY) {
-      throw new Error("CLAUDE_API_KEY is missing in .env");
-    }
+if (!process.env.CLAUDE_API_KEY) {
+  throw new Error("CLAUDE_API_KEY is missing in .env");
+}
 
-    const response = await fetch(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "x-api-key": process.env.CLAUDE_API_KEY,
-          "anthropic-version": "2023-06-01",
-          "content-type": "application/json"
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 300,
+const response = await fetch(
+  "https://api.anthropic.com/v1/messages",
+  {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.CLAUDE_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json"
+    },
+    body: JSON.stringify({
+      model: MODEL,
 
-          // ✅ SYSTEM CONTROL (IMPORTANT)
-          system: [
-            {
-              type: "text",
-              text: `You are Predict Health AI, a concise health assistant specializing in biomarkers, vascular health, and recovery.
+      // 🔥 FIX 1: prevent truncation
+      max_tokens: 2000,
+      temperature: 0,
 
-RESPONSE RULES (strict):
-- Maximum 3-4 sentences. Never longer.
-- Plain prose only. NO tables, NO headings, NO bullet lists, NO emojis, NO section dividers.
-- Conversational tone, like texting a knowledgeable friend.
-- Answer the question directly. Don't pad with disclaimers, "important first steps", or generic wellness advice.
-- Only add "consult a doctor" if the user describes severe symptoms — never as a default closer.
-- Never diagnose or prescribe.
+      // 🔥 FIX 2: force structured JSON output
+      system: [
+        {
+          type: "text",
+          text: `
 
-If asked about something outside health, politely redirect in one sentence.`
-            }
-          ],
+You are a medical report parser.
 
-          // ✅ USE FULL CONVERSATION
-          messages: messages
-        })
-      }
-    );
-    console.log("MODEL USED:", MODEL);
-    
+Return ONLY valid JSON.
 
-    const data = await response.json();
-    console.log("🧠 FULL CLAUDE RESPONSE:", data);
+STRICT RULES:
 
-    if (!response.ok) {
-      console.error("❌ Claude API Error:", data);
-      throw new Error(data.error?.message || "Claude request failed");
-    }
+No markdown
+No explanation
+No extra text
+Do not truncate
+Always include value + unit
+Skip biomarker if value or unit missing
 
-    if (!data.content || !data.content[0]?.text) {
-      console.error("❌ Invalid Claude response:", data);
-      throw new Error("Invalid Claude response");
-    }
+FORMAT:
+{
+"biomarkers": [
+{ "name": "HbA1c", "value": 7.0, "unit": "%" }
+]
+}
+`
+}
+],
 
-    return data.content[0].text.trim();
-
-  } catch (error) {
-    console.error("🔥 CLAUDE ERROR:", error.message);
-
-    return "AI is currently unavailable. Please consult a healthcare professional.";
+      messages: messages
+    })
   }
+);
+
+console.log("MODEL USED:", MODEL);
+
+const data = await response.json();
+console.log("🧠 FULL CLAUDE RESPONSE:", data);
+
+if (!response.ok) {
+  console.error("❌ Claude API Error:", data);
+  throw new Error(data.error?.message || "Claude request failed");
+}
+
+if (!data.content || !data.content[0]?.text) {
+  console.error("❌ Invalid Claude response:", data);
+  throw new Error("Invalid Claude response");
+}
+
+let output = data.content[0].text.trim();
+
+// 🔥 FIX 3: clean markdown if Claude still adds it
+if (output.startsWith("```")) {
+  output = output.replace(/```json|```/g, "").trim();
+}
+
+return output;
+
+} catch (error) {
+console.error("🔥 CLAUDE ERROR:", error.message);
+
+// keep your app safe (no crash)
+return "AI is currently unavailable. Please consult a healthcare professional.";
+
+}
 };
 
 module.exports = { callLLM };
