@@ -25,7 +25,7 @@ const aliasMap = {
   ],
 
   // 🧬 OXIDATIVE / INFLAMMATION
-  MDA: ["mda"],
+  MDA: ["mda", "malondialdehyde"],
   IL6: ["il6", "il-6", "interleukin6"],
 
   // 💪 MUSCLE
@@ -91,7 +91,7 @@ Phosphorus: [
   Osteocalcin: ["osteocalcin"],
 
   // 🧠 NEURO
-  BDNF: ["bdnf"],
+  BDNF: ["bdnf", "brainderivedneurotrophicfactor"],
 
   // ⚠️ OPTIONAL
   ESR: ["esr", "erythrocytesedimentationrate"],
@@ -103,7 +103,7 @@ Phosphorus: [
   Globulin: ["globulin"],
 
   // 🔥 ADVANCED
-  TGFb1: ["tgfb1", "tgf-b1", "tgfβ1", "tgf-β1", "tgf1"],
+  TGFb1: ["tgfb1", "transforminggrowthfactorbeta1","tgf-b1", "tgfβ1", "tgf-β1", "tgf1"],
   MMP9: ["mmp9", "mmp-9", "matrixmetalloproteinase9"],
   MMP3: ["mmp3", "mmp-3"],
   CTXII: [
@@ -134,7 +134,8 @@ Phosphorus: [
 // 🔧 NORMALIZATION
 function extractShortName(name) {
   const match = name.match(/\((.*?)\)/);
-  return match ? match[1] : name;
+  if (match) return match[1];
+  return name;
 }
 
 function normalizeName(name) {

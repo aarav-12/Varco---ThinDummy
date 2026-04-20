@@ -23,10 +23,21 @@ function mergeBiomarkers(biomarkersArray) {
 async function callWithRetry(messages, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
-      return await callLLM(messages, "extract");
+      const res = await callLLM(messages, "extract");
+
+      if (
+        res &&
+        !res.includes("AI is currently unavailable") &&
+        !res.includes("Overloaded")
+      ) {
+        return res;
+      }
+
+      console.log("⚠️ Retry attempt:", i + 1);
+      await new Promise(r => setTimeout(r, 1200 * (i + 1)));
     } catch (err) {
-      console.log("⚠️ Retry:", i + 1);
-      await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+      console.log("⚠️ Retry attempt:", i + 1);
+      await new Promise(r => setTimeout(r, 1200 * (i + 1)));
     }
   }
 
@@ -43,9 +54,7 @@ async function extractBiomarkersFromText(fullText) {
 
   for (const chunk of chunks) {
     try {
-      const response = await callWithRetry(
-        [{ role: "user", content: chunk }],
-      );
+      const response = await callWithRetry([{ role: "user", content: chunk }]);
 
       if (!response) {
         console.log("❌ Skipping chunk permanently");
@@ -62,7 +71,7 @@ async function extractBiomarkersFromText(fullText) {
         allBiomarkers.push(...parsed.biomarkers);
       }
 
-      await new Promise(r => setTimeout(r, 700));
+      await new Promise(r => setTimeout(r, 800));
     } catch (err) {
       console.log("❌ Chunk parse failed, skipping...");
     }
