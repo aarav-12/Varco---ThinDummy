@@ -153,10 +153,10 @@ function mapBiomarkers(inputBiomarkers) {
       );
 
       if (
-        normalizedAliases.includes(clean) ||                      // exact match
-        normalizedAliases.some(a => clean.includes(a)) ||         // partial match
-        normalizedAliases.some(a => a.includes(clean)) ||         // reverse match
-        clean.includes(canonical.toLowerCase())                   // fallback
+        normalizedAliases.includes(clean) ||
+        normalizedAliases.some(a => clean === a) ||   // exact alias match only
+        normalizedAliases.some(a => clean.startsWith(a)) ||
+        normalizedAliases.some(a => a.startsWith(clean))
       ) {
         found = canonical;
         break;
