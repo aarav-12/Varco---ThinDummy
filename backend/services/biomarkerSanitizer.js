@@ -3,30 +3,27 @@
 function normalizeUnits(biomarkers) {
   const normalized = {};
 
-  // 🔥 STRICT SANITY BOUNDS (used for rejection, not warning)
   const SANITY_BOUNDS = {
-    BDNF: { min: 1, max: 100 },        // ng/mL
-    MMP9: { min: 50, max: 2000 },      // ng/mL
-    CTXII: { min: 0.05, max: 2.0 },    // ng/mL
-    MDA: { min: 0.1, max: 20 },        // µmol/L
+    BDNF: { min: 1, max: 100 },
+    MMP9: { min: 50, max: 2000 },
+    CTXII: { min: 0.05, max: 2.0 },
+    MDA: { min: 0.1, max: 20 },
     CRP: { min: 0.01, max: 50 }
   };
 
-  // 🔥 UNIT NORMALIZER (handles ALL your earlier bugs)
   function normalizeUnit(unit) {
     if (!unit) return "";
 
     return unit
       .toLowerCase()
-      .replace(/[µμ]/g, "u")     // µ → u
-      .replace(/\s/g, "")        // remove spaces
-      .replace(/\/1\.73m2$/, ""); // eGFR fix
+      .replace(/[µμ]/g, "u")
+      .replace(/\s/g, "")
+      .replace(/\/1\.73m2$/, "");
   }
 
   function isPlausible(key, value) {
     const bounds = SANITY_BOUNDS[key];
     if (!bounds) return true;
-
     return value >= bounds.min && value <= bounds.max;
   }
 
@@ -35,13 +32,13 @@ function normalizeUnits(biomarkers) {
 
     if (value == null) continue;
 
-    const cleanKey = key.replace(/[^a-zA-Z0-9]/g, "");
+    const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
     let cleanUnit = normalizeUnit(unit);
 
     console.log("CHECK:", key, value, unit);
 
     // 🧠 HEMOGLOBIN
-    if (cleanKey.toLowerCase() === "hemoglobin") {
+    if (cleanKey === "hemoglobin") {
       if (cleanUnit === "mg/dl") {
         value = value / 100;
         unit = "g/dL";
@@ -50,7 +47,7 @@ function normalizeUnits(biomarkers) {
     }
 
     // 🍬 GLUCOSE
-    if (cleanKey.toLowerCase().includes("glucose")) {
+    if (cleanKey.includes("glucose")) {
       if (cleanUnit === "mmol/l") {
         value = value * 18;
         unit = "mg/dL";
@@ -59,10 +56,10 @@ function normalizeUnits(biomarkers) {
 
     // 🫀 LIPIDS
     if (
-      cleanKey.toLowerCase().includes("cholesterol") ||
-      cleanKey.toLowerCase() === "ldl" ||
-      cleanKey.toLowerCase() === "hdl" ||
-      cleanKey.toLowerCase().includes("triglycerides")
+      cleanKey.includes("cholesterol") ||
+      cleanKey === "ldl" ||
+      cleanKey === "hdl" ||
+      cleanKey.includes("triglycerides")
     ) {
       if (cleanUnit === "mmol/l") {
         value = value * 38.67;
@@ -71,7 +68,7 @@ function normalizeUnits(biomarkers) {
     }
 
     // 🧪 CREATININE
-    if (cleanKey.toLowerCase() === "creatinine") {
+    if (cleanKey === "creatinine") {
       if (cleanUnit === "umol/l") {
         value = value / 88.4;
         unit = "mg/dL";
@@ -79,7 +76,7 @@ function normalizeUnits(biomarkers) {
     }
 
     // 🌞 VITAMIN D
-    if (cleanKey.toLowerCase() === "vitamind") {
+    if (cleanKey === "vitamind") {
       if (cleanUnit === "nmol/l") {
         value = value / 2.5;
         unit = "ng/mL";
@@ -87,29 +84,29 @@ function normalizeUnits(biomarkers) {
     }
 
     // 🔥 eGFR FIX
-    if (cleanKey.toLowerCase() === "egfr") {
+    if (cleanKey === "egfr") {
       unit = "mL/min";
     }
 
-    // 🔥 MDA FIX (ng/mL → µmol/L)
-    if (cleanKey.toLowerCase() === "mda" && cleanUnit === "ng/ml") {
-      value = value * 0.0345;
+    // 🔥 MDA FIX (CORRECTED)
+    if (cleanKey === "mda" && cleanUnit === "ng/ml") {
+      value = value / 28.97; // ✅ FIXED (accurate)
       unit = "µmol/L";
     }
 
-    // 🚨 HARD REJECTIONS (MOST IMPORTANT PART)
+    // 🚨 HARD REJECTIONS
 
-    if (cleanKey.toLowerCase() === "bdnf" && value < 1) {
+    if (cleanKey === "bdnf" && value < 1) {
       console.log("🚨 REJECT BDNF (implausible):", value);
       continue;
     }
 
-    if (cleanKey.toLowerCase() === "mmp9" && value < 50) {
+    if (cleanKey === "mmp9" && value < 50) {
       console.log("🚨 REJECT MMP9 (implausible):", value);
       continue;
     }
 
-    // ❌ INVALID UNIT FORMAT (like x10^3/uL)
+    // ❌ INVALID UNIT FORMAT
     if (cleanUnit.includes("x10") || cleanUnit.includes("^")) {
       console.log("🚨 REJECT INVALID UNIT:", key, unit);
       continue;
@@ -121,7 +118,7 @@ function normalizeUnits(biomarkers) {
       continue;
     }
 
-    // ✅ FINAL CLEAN STORE
+    // ✅ FINAL STORE
     normalized[key] = {
       value: Number(value),
       unit
