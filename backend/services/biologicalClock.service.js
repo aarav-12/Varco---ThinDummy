@@ -218,17 +218,7 @@ function calculateConfidence(flattened, reference) {
 function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights) {
   const zScores = calculateZScores(patientBiomarkers, referenceData);
 
-  const severity = applyDirectionality(zScores, referenceData);
-
-  const domainScores = calculateDomainScores(severity, referenceData);
-
-  const compositeScore = calculateCompositeScore(domainScores, domainWeights);
-
-  const ageResults = calculateBiologicalAge(compositeScore, age);
-
-  const confidence = calculateConfidence(patientBiomarkers, referenceData);
-
-  // 🔥 GROUP BIOMARKERS BY DOMAIN (SAFE ADDITION)
+  // 🔥 BUILD DOMAIN → BIOMARKERS MAP
   const biomarkersByDomain = {};
 
   for (const key in zScores) {
@@ -243,16 +233,26 @@ function runBiologicalClock(patientBiomarkers, age, referenceData, domainWeights
     biomarkersByDomain[domain].push(key);
   }
 
+  const severity = applyDirectionality(zScores, referenceData);
+
+  const domainScores = calculateDomainScores(severity, referenceData);
+
+  const compositeScore = calculateCompositeScore(domainScores, domainWeights);
+
+  const ageResults = calculateBiologicalAge(compositeScore, age);
+
+  const confidence = calculateConfidence(patientBiomarkers, referenceData);
+
   return {
     biomarkers: patientBiomarkers,
     zScores,
     severity,
     domainScores,
+    biomarkersByDomain,
     compositeScore,
     deltaAge: ageResults.deltaAge,
     biologicalAge: ageResults.biologicalAge,
-    confidence,
-    biomarkersByDomain
+    confidence
   };
 }
 
