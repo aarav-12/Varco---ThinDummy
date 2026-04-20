@@ -26,7 +26,7 @@ app.use(cors({
     /\.lovable\.app$/,
     /\.lovableproject\.com$/
   ],
-  methods: ["GET", "POST", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
     "Content-Type",
     "Authorization"
