@@ -121,6 +121,11 @@ Phosphorus: [
 
 
 // 🔧 NORMALIZATION
+function extractShortName(name) {
+  const match = name.match(/\((.*?)\)/);
+  return match ? match[1] : name;
+}
+
 function normalizeName(name) {
   return name
     .toLowerCase()
@@ -136,7 +141,8 @@ function mapBiomarkers(inputBiomarkers) {
 
   for (const key in inputBiomarkers) {
 
-    const clean = normalizeName(key);
+    const rawName = extractShortName(key);
+    const clean = normalizeName(rawName);
     console.log("🔍 CHECK:", key, "→", clean);
 
     let found = null;
@@ -146,7 +152,12 @@ function mapBiomarkers(inputBiomarkers) {
         normalizeName(a)
       );
 
-      if (normalizedAliases.includes(clean)) {
+      if (
+        normalizedAliases.includes(clean) ||                      // exact match
+        normalizedAliases.some(a => clean.includes(a)) ||         // partial match
+        normalizedAliases.some(a => a.includes(clean)) ||         // reverse match
+        clean.includes(canonical.toLowerCase())                   // fallback
+      ) {
         found = canonical;
         break;
       }
