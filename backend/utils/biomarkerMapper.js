@@ -205,6 +205,10 @@ function mapBiomarkers(inputBiomarkers) {
 
     const biomarker = inputBiomarkers[key];
 
+    if (clean === "aldolasea") {
+      console.log("🧠 MAPPER INPUT:", key, biomarker);
+    }
+
     if (!found) {
       console.warn("🚨 DROPPED BIOMARKER:", key);
 

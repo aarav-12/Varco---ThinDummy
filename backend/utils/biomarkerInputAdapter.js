@@ -17,6 +17,10 @@ function buildBiomarkerMap(array) {
       b.unit
     );
 
+    if (name.toLowerCase().includes("aldolase")) {
+      console.log("📥 RAW FROM LLM:", name, value, unit);
+    }
+
     // no more "detected" units
     if (unit === "detected") {
       unit = biomarkerReference[name]?.unit || "unknown";
