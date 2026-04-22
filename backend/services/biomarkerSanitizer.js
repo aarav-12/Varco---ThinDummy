@@ -35,6 +35,10 @@ function normalizeUnits(biomarkers) {
     const cleanKey = key.toLowerCase().replace(/[^a-z0-9]/g, "");
     let cleanUnit = normalizeUnit(unit);
 
+    if (cleanKey.toLowerCase() === "aldolasea") {
+      console.log("🟢 BEFORE ANY LOGIC:", value, unit);
+    }
+
     console.log("CHECK:", key, value, unit);
 
     // 🧠 HEMOGLOBIN
@@ -48,6 +52,10 @@ function normalizeUnits(biomarkers) {
     if (cleanKey.toLowerCase() === "aldolasea") {
       // 🔒 HARD LOCK — DO NOT MODIFY
       unit = unit || "ng/mL";
+    }
+
+    if (cleanKey.toLowerCase() === "aldolasea") {
+      console.log("🟡 AFTER UNIT CLEAN:", value, cleanUnit);
     }
 
     // 🍬 GLUCOSE
@@ -120,6 +128,10 @@ function normalizeUnits(biomarkers) {
     }
 
     // ✅ FINAL STORE
+    if (cleanKey.toLowerCase() === "aldolasea") {
+      console.log("🔴 BEFORE STORE:", value, unit);
+    }
+
     normalized[key] = {
       value: Number(value),
       unit
