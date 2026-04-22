@@ -110,6 +110,28 @@ const uploadReport = async (req, res) => {
       age: age
     });
 
+    // 🔥 STEP 5B — PERSIST BIOMARKERS (NEW)
+    const patientId = req.body.patientId || req.query.patientId;
+
+    if (patientId) {
+      try {
+        await pool.query(
+          `UPDATE patients SET raw_inputs = $1, last_report_at = $2 WHERE id = $3`,
+          [
+            JSON.stringify({
+              biomarkers: map,
+              updatedAt: new Date().toISOString()
+            }),
+            new Date(),
+            patientId
+          ]
+        );
+        console.log("✅ Biomarkers persisted for patient:", patientId);
+      } catch (e) {
+        console.warn("⚠️ Failed to persist biomarkers:", e.message);
+      }
+    }
+
     // 🔥 STEP 6 — MISSING BIOMARKERS
     const CRITICAL = ["IL6", "MDA", "VEGF", "eGFR", "PTH"];
     const missingBiomarkers = CRITICAL.filter(k => !map[k]);

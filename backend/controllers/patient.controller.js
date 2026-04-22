@@ -231,9 +231,44 @@ exports.getPatientById = async (req, res) => {
       });
     }
 
+    const p = result.rows[0];
+
+    // 🔥 BUILD BIOMARKERS BY DOMAIN (NEW)
+    const DOMAIN_STRUCTURE = {
+      IRF: ["CRP", "IL6", "MDA"],
+      VAF: ["VEGF", "MMP9", "TGFb1"],
+      PNF: ["BDNF", "SP"],
+      MHF: ["COMP", "CKMM", "AldolaseA", "CTXII"],
+      BMF: ["Calcium", "PTH", "VitaminD", "Osteocalcin", "Phosphorus"],
+      CMF: ["HbA1c", "TotalCholesterol", "LDL", "Triglycerides", "HDL"],
+      RFF: ["Creatinine", "BUN", "eGFR"]
+    };
+
+    const biomarkersByDomain = {};
+    const biomarkers = p.raw_inputs?.biomarkers || p.biomarkers || {};
+
+    for (const domain in DOMAIN_STRUCTURE) {
+      biomarkersByDomain[domain] = {};
+      for (const biomarkerName of DOMAIN_STRUCTURE[domain]) {
+        if (biomarkers[biomarkerName]) {
+          biomarkersByDomain[domain][biomarkerName] = biomarkers[biomarkerName];
+        }
+      }
+    }
+
     return res.json({
       success: true,
-      patient: result.rows[0]
+      id: p.id,
+      name: p.name,
+      age: p.age,
+      chronological_age: p.chronological_age,
+      biological_age: p.biological_age,
+      delta_age: p.delta_age,
+      domain_scores: p.domain_scores,
+      domain_contributions: p.domain_contributions,
+      raw_inputs: p.raw_inputs,
+      biomarkers: p.raw_inputs?.biomarkers || p.biomarkers || {},
+      biomarkersByDomain: biomarkersByDomain
     });
 
   } catch (error) {
