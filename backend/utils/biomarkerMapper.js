@@ -30,14 +30,10 @@ const aliasMap = {
 
   // 💪 MUSCLE
   CKMM: [
-    "ck",
-    "cpk",
-    "cpk(total)",
-    "cpktotal",
-    "creatinekinase",
     "ckmm",
     "ck-mm",
-    "creatinekinasemm"
+    "ckm",
+    "creatinekinasemuscle"
   ],
 
   AldolaseA: ["aldolase", "aldolasea"],
@@ -103,7 +99,15 @@ Phosphorus: [
   Globulin: ["globulin"],
 
   // 🔥 ADVANCED
-  TGFb1: ["tgfb1", "transforminggrowthfactorbeta1","tgf-b1", "tgfβ1", "tgf-β1", "tgf1"],
+  TGFb1: [
+    "tgfb1",
+    "tgf-b1",
+    "transforminggrowthfactorbeta1",
+    "transforming growth factor beta 1",
+    "tgfβ1",
+    "tgf-β1",
+    "tgf1"
+  ],
   MMP9: ["mmp9", "mmp-9", "matrixmetalloproteinase9"],
   MMP3: ["mmp3", "mmp-3"],
   CTXII: [
@@ -112,7 +116,11 @@ Phosphorus: [
   "crosslinkedctelopeptide",
   "crosslinkedctelopeptideoftypeiicollagen"
 ],
-  COMP: ["comp"],
+  COMP: [
+    "comp",
+    "cartilageoligomericmatrixprotein",
+    "cartilage oligomeric matrix protein"
+  ],
 
   // 🧪 RATIOS
   CaPRatio: ["capratio", "calciumphosphorusratio"],
@@ -127,7 +135,7 @@ Phosphorus: [
 ],
 
   // 🧪 SHORT FORMS
-  SP: ["sp"]
+  SP: ["sp", "substancep", "substance p"]
 };
 
 
@@ -164,13 +172,27 @@ function mapBiomarkers(inputBiomarkers) {
         normalizeName(a)
       );
 
-      if (
-        normalizedAliases.includes(clean) ||
-        normalizedAliases.some(a => clean.startsWith(a)) ||
-        normalizedAliases.some(a => a.startsWith(clean))
-      ) {
+      // ✅ EXACT match first (most important)
+      if (normalizedAliases.includes(clean)) {
         found = canonical;
         break;
+      }
+    }
+
+    // ✅ ONLY IF NOT FOUND → THEN DO FUZZY
+    if (!found) {
+      for (const canonical in aliasMap) {
+        const normalizedAliases = aliasMap[canonical].map(a =>
+          normalizeName(a)
+        );
+
+        if (
+          normalizedAliases.some(a => clean.includes(a)) ||
+          normalizedAliases.some(a => a.includes(clean))
+        ) {
+          found = canonical;
+          break;
+        }
       }
     }
 

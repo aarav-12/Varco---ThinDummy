@@ -96,14 +96,12 @@ function normalizeUnits(biomarkers) {
 
     // 🚨 HARD REJECTIONS
 
-    if (cleanKey === "bdnf" && value < 1) {
-      console.log("🚨 REJECT BDNF (implausible):", value);
-      continue;
+    if (cleanKey === "bdnf" && value < 0.1) {
+      console.log("⚠️ LOW BDNF (kept):", value);
     }
 
-    if (cleanKey === "mmp9" && value < 50) {
-      console.log("🚨 REJECT MMP9 (implausible):", value);
-      continue;
+    if (cleanKey === "mmp9" && value < 10) {
+      console.log("⚠️ LOW MMP9 (kept):", value);
     }
 
     // ❌ INVALID UNIT FORMAT

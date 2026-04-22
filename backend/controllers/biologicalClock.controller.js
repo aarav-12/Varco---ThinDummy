@@ -11,6 +11,7 @@ const { normalizeUnits } = require("../services/biomarkerSanitizer");
 const { mapBiomarkers } = require("../utils/biomarkerMapper");
 const { buildBiomarkerMap } = require("../utils/biomarkerInputAdapter");
 const { applyUnitConversion } = require("../utils/unitConversion");
+const DOMAIN_STRUCTURE = require("../constants/domainStructure");
 
 const biomarkerReference = require("../db/biomarkerReference");
 const domainWeights = require("../db/domainWeights");
@@ -167,7 +168,7 @@ const calculateBiologicalAgeController = async (req, res) => {
     const topIssues = getTopInsights(domainScores);
 
     // ✅ FINAL RESPONSE
-    const response = {
+    const result = {
       biologicalAge: ageResult.biologicalAge,
       deltaAge: ageResult.deltaAge,
 
@@ -183,12 +184,27 @@ const calculateBiologicalAgeController = async (req, res) => {
       algorithmVersion: "3.0"
     };
 
-    response.confidenceLabel = confidenceLabel;
-    response.note = note;
-    response.dataPoints = count;
-    response.source = "pdf_upload";
+    result.confidenceLabel = confidenceLabel;
+    result.note = note;
+    result.dataPoints = count;
+    result.source = "pdf_upload";
 
-    res.json(response);
+    const biomarkersByDomain = {};
+
+    for (const domain in DOMAIN_STRUCTURE) {
+      biomarkersByDomain[domain] = [];
+
+      DOMAIN_STRUCTURE[domain].forEach((biomarker) => {
+        if (result.matched.includes(biomarker)) {
+          biomarkersByDomain[domain].push(biomarker);
+        }
+      });
+    }
+
+    res.json({
+      ...result,
+      biomarkersByDomain
+    });
 
     // ✅ NON-BLOCKING DB SAVE
     try {
