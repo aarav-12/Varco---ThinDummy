@@ -45,10 +45,9 @@ function normalizeUnits(biomarkers) {
       }
     }
 
-    // 🟠 ALDOLASE A
     if (cleanKey.toLowerCase() === "aldolasea") {
-      // DO NOTHING unless unit mismatch is proven
-      // (right now your input is valid)
+      // 🔒 HARD LOCK — DO NOT MODIFY
+      unit = unit || "ng/mL";
     }
 
     // 🍬 GLUCOSE
