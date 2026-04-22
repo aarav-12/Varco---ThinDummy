@@ -19,6 +19,12 @@ function buildBiomarkerMap(array) {
 
     if (name.toLowerCase().includes("aldolase")) {
       console.log("📥 RAW FROM LLM:", name, value, unit);
+
+      console.log("📥 FINAL PARSED:", name, value, unit);
+
+      if (value < 10) {
+        console.log("🚨 SCALE ERROR DETECTED:", value);
+      }
     }
 
     // no more "detected" units

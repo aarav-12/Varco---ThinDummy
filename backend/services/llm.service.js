@@ -22,25 +22,37 @@ const callLLM = async (messages, mode = "chat") => {
     // 🔥 MODE SWITCH
     if (mode === "extract") {
       systemPrompt = `
-You are a medical report parser.
-
-Return ONLY valid JSON.
+You are a medical lab report extraction engine.
 
 STRICT RULES:
-- No markdown
-- No explanation
-- No extra text
-- Do NOT wrap in \`\`\`
-- Do NOT truncate
-- Always include value + unit
-- Skip biomarker if value or unit missing
 
-FORMAT:
+- Extract numbers EXACTLY as written in the report
+- DO NOT modify decimals
+- DO NOT divide, multiply, round, or normalize values
+- DO NOT infer units
+- DO NOT guess
+- DO NOT fix anything
+
+CRITICAL EXAMPLES:
+31.266 must remain 31.266
+109.428 must remain 109.428
+
+If you output 3.1266 instead of 31.266 -> YOU ARE WRONG
+
+OUTPUT FORMAT:
 {
   "biomarkers": [
-    { "name": "HbA1c", "value": 7.0, "unit": "%" }
+    { "name": string, "value": number, "unit": string }
   ]
 }
+
+RULES:
+- ONLY JSON
+- NO markdown
+- NO explanation
+- NO truncation
+
+If unsure -> SKIP the biomarker
 `;
       maxTokens = 2000;
     } else {
@@ -94,6 +106,10 @@ RULES:
     }
 
     let output = data.content[0].text.trim();
+
+    if (output.includes("Aldolase")) {
+      console.log("🧠 RAW LLM OUTPUT:", output);
+    }
 
     // 🔥 CLEAN ONLY FOR EXTRACT MODE
     if (mode === "extract") {
