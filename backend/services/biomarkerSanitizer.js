@@ -47,9 +47,8 @@ function normalizeUnits(biomarkers) {
 
     // 🟠 ALDOLASE A
     if (cleanKey.toLowerCase() === "aldolasea") {
-      if (cleanUnit === "u/l" && value > 100) {
-        // keep as is
-      }
+      // DO NOTHING unless unit mismatch is proven
+      // (right now your input is valid)
     }
 
     // 🍬 GLUCOSE
