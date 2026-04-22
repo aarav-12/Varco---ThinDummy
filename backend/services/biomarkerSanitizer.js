@@ -43,7 +43,14 @@ function normalizeUnits(biomarkers) {
         value = value / 100;
         unit = "g/dL";
       }
-      if (value > 30) value = value / 10;
+    }
+
+    // 🟠 ALDOLASE A
+    if (cleanKey.toLowerCase() === "aldolasea") {
+      // Only convert if unit mismatch is confirmed
+      if (cleanUnit === "u/l" && value > 100) {
+        value = value / 10;
+      }
     }
 
     // 🍬 GLUCOSE
@@ -112,8 +119,7 @@ function normalizeUnits(biomarkers) {
 
     // ❌ FINAL PLAUSIBILITY FILTER
     if (!isPlausible(key, value)) {
-      console.log("🚨 REJECT (out of bounds):", key, value);
-      continue;
+      console.log("⚠️ OUT OF RANGE (KEPT):", key, value);
     }
 
     // ✅ FINAL STORE
@@ -121,6 +127,8 @@ function normalizeUnits(biomarkers) {
       value: Number(value),
       unit
     };
+
+    console.log("✅ FINAL BIOMARKERS:", Object.keys(normalized));
   }
 
   return normalized;

@@ -167,19 +167,26 @@ function mapBiomarkers(inputBiomarkers) {
 
     let found = null;
 
-    for (const canonical in aliasMap) {
-      const normalizedAliases = aliasMap[canonical].map(a =>
-        normalizeName(a)
-      );
+    // 🔒 HARDCODED PRIORITY MATCHES (CRITICAL FIX)
+    if (clean.includes("tgf")) {
+      found = "TGFb1";
+    }
 
-      // ✅ EXACT match first (most important)
-      if (normalizedAliases.includes(clean)) {
-        found = canonical;
-        break;
+    if (!found) {
+      for (const canonical in aliasMap) {
+        const normalizedAliases = aliasMap[canonical].map(a =>
+          normalizeName(a)
+        );
+
+        // 1. EXACT MATCH FIRST
+        if (normalizedAliases.includes(clean)) {
+          found = canonical;
+          break;
+        }
       }
     }
 
-    // ✅ ONLY IF NOT FOUND → THEN DO FUZZY
+    // 2. ONLY THEN FUZZY MATCH
     if (!found) {
       for (const canonical in aliasMap) {
         const normalizedAliases = aliasMap[canonical].map(a =>
