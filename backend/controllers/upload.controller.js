@@ -102,10 +102,15 @@ const uploadReport = async (req, res) => {
     // 🔥 STEP 5 — RUN ALGORITHM
     const age = Number(req.body.age) || 60;
 
+    console.log("===== FINAL INPUT SNAPSHOT =====");
+    console.log(JSON.stringify(map, null, 2));
+
     const result = runAlgorithm({
       biomarkers: map,
       age: age
     });
+
+    console.log("===== FINAL BIO AGE =====", result.biologicalAge);
 
     // 🔥 STEP 5B — SINGLE CORRECT PERSISTENCE BLOCK
     const patientId =
