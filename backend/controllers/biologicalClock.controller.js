@@ -184,6 +184,37 @@ const calculateBiologicalAgeController = async (req, res) => {
       algorithmVersion: "3.0"
     };
 
+    {
+      const { patientId } = req.body;
+
+      if (patientId) {
+        try {
+          await pool.query(
+            `UPDATE patients
+             SET biological_age = $1,
+                 delta_age = $2,
+                 domain_scores = $3,
+                 domain_contributions = $4,
+                 updated_at = $5
+             WHERE id = $6`,
+            [
+              result.biologicalAge,
+              result.deltaAge,
+              JSON.stringify(result.domainScores || {}),
+              JSON.stringify(result.domainContributions || {}),
+              new Date(),
+              patientId
+            ]
+          );
+
+          console.log("✅ FINAL RESULT SAVED:", patientId);
+
+        } catch (err) {
+          console.error("❌ Failed to save final result:", err.message);
+        }
+      }
+    }
+
     result.confidenceLabel = confidenceLabel;
     result.note = note;
     result.dataPoints = count;
