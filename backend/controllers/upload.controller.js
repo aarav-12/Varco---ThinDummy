@@ -1,7 +1,8 @@
 const { extractTextFromPDF } = require("../services/pdfParser");
 const { extractBiomarkersFromText, mergeBiomarkers } = require("../services/reportAI.service");
 const { fallbackExtract } = require("../services/ruleExtractor");
-const { runAlgorithm } = require("../services/algorithm.service"); // 🔥 IMPORTANT
+const { runAlgorithm } = require("../services/algorithm.service");
+const pool = require("../db");
 
 const uploadReport = async (req, res) => {
   try {
@@ -102,7 +103,7 @@ const uploadReport = async (req, res) => {
       });
     }
 
-    // 🔥 STEP 5 — RUN ALGORITHM (DIRECT CALL)
+    // 🔥 STEP 5 — RUN ALGORITHM
     const age = Number(req.body.age) || 60;
 
     const result = runAlgorithm({
@@ -110,22 +111,27 @@ const uploadReport = async (req, res) => {
       age: age
     });
 
-    // 🔥 STEP 5B — PERSIST BIOMARKERS (NEW)
-    const patientId = req.body.patientId || req.query.patientId;
+    // 🔥 STEP 5B — SINGLE CORRECT PERSISTENCE BLOCK
+    const patientId =
+      req.body.patientId || req.query.patientId || req.user?.id;
 
     if (patientId) {
       try {
         await pool.query(
-          `UPDATE patients SET raw_inputs = $1, last_report_at = $2 WHERE id = $3`,
+          `UPDATE patients
+           SET raw_inputs = $1,
+               last_report_at = $2
+           WHERE id = $3`,
           [
             JSON.stringify({
-              biomarkers: map,
+              biomarkers: map, // ✅ ALWAYS FINAL MAP
               updatedAt: new Date().toISOString()
             }),
             new Date(),
             patientId
           ]
         );
+
         console.log("✅ Biomarkers persisted for patient:", patientId);
       } catch (e) {
         console.warn("⚠️ Failed to persist biomarkers:", e.message);
@@ -151,7 +157,7 @@ const uploadReport = async (req, res) => {
     if (map.CRP?.value > 1)
       topFixes.push("Reduce inflammation");
 
-    // 🔥 STEP 8 — FINAL RESPONSE (DUAL FORMAT SAFE)
+    // 🔥 STEP 8 — FINAL RESPONSE
 
     const biomarkerArray = Object.keys(map).map((key, i) => ({
       id: `parsed-b${i + 1}`,
@@ -168,28 +174,25 @@ const uploadReport = async (req, res) => {
     }));
 
     return res.json({
-      // ✅ KEEP YOUR ORIGINAL SYSTEM (UNCHANGED)
       success: true,
       data: {
         biologicalAge: result.biologicalAge ?? null,
         deltaAge: result.deltaAge ?? null,
         confidence: result.confidence ?? 0,
         dataPoints: result.dataPoints ?? 0,
-
         topIssues: result.topIssues ?? [],
         topFixes: topFixes.slice(0, 3),
         missingBiomarkers: missingBiomarkers ?? [],
-
         domainScores: result.domainScores ?? {},
         algorithmVersion: "3.0"
       },
 
-      // ✅ ADD LOVABLE FORMAT (NEW)
       patient: {
         name: "Unknown",
         age: 60,
         gender: "unknown"
       },
+
       biomarkers: biomarkerArray
     });
 
