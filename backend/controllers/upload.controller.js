@@ -119,15 +119,13 @@ const uploadReport = async (req, res) => {
       try {
         await pool.query(
           `UPDATE patients
-           SET raw_inputs = $1,
-               last_report_at = $2
-           WHERE id = $3`,
+           SET raw_inputs = $1
+           WHERE id = $2`,
           [
             JSON.stringify({
               biomarkers: map, // ✅ ALWAYS FINAL MAP
               updatedAt: new Date().toISOString()
             }),
-            new Date(),
             patientId
           ]
         );
