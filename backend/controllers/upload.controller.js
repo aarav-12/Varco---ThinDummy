@@ -64,26 +64,22 @@ const uploadReport = async (req, res) => {
     const ruleBiomarkers = fallbackExtract(text);
     console.log("🧩 RULE BIOMARKERS:", ruleBiomarkers);
 
-    // 🔹 STEP 3 — AI
-    let extracted = [];
+    // 🔹 STEP 3 — AI (SINGLE SOURCE OF TRUTH)
+    let rawArray = [];
 
     try {
-      extracted = await extractBiomarkersFromText(text);
+      const aiResult = await extractBiomarkersFromText(text);
+
+      if (Array.isArray(aiResult) && aiResult.length > 0) {
+        console.log("✅ USING AI DATA ONLY");
+        rawArray = aiResult;
+      } else {
+        console.log("⚠️ AI EMPTY → USING RULE FALLBACK");
+        rawArray = ruleToArray(ruleBiomarkers);
+      }
+
     } catch (e) {
-      console.log("⚠️ AI extraction failed, continuing...");
-    }
-
-    const finalBiomarkers = mergeBiomarkers(extracted);
-    console.log("✅ FINAL COUNT:", finalBiomarkers.length);
-
-    // 🔹 STEP 4 — PICK SOURCE
-    let rawArray;
-
-    if (finalBiomarkers.length > 0) {
-      console.log("✅ USING AI DATA");
-      rawArray = finalBiomarkers;
-    } else {
-      console.log("⚠️ USING RULE-BASED FALLBACK");
+      console.log("⚠️ AI FAILED → USING RULE FALLBACK");
       rawArray = ruleToArray(ruleBiomarkers);
     }
 
