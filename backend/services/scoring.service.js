@@ -1,43 +1,124 @@
-/* eslint-disable no-undef */
 // services/scoring.service.js
 
-function calculateRisk(painLevel) {
+const biomarkerReference = require("../db/biomarkerReference");
+const domainWeights = require("../db/domainWeights");
+const {
+  runBiologicalClock
+} = require("./biologicalClock.service");
 
-    console.log("🔍 Raw painLevel received:", painLevel);
-  // Step 1: Validate input
+function normalizeBiomarkerInput(inputBiomarkers) {
+  if (!inputBiomarkers) return {};
+
+  if (Array.isArray(inputBiomarkers)) {
+    // OLD FLATTENING (COMMENTED AS REQUESTED — DO NOT REMOVE)
+    // const flattened = {};
+    const normalized = {};
+
+    inputBiomarkers.forEach(item => {
+      if (!item || !item.name) return;
+
+      const value = item.value ?? item.score ?? item.amount;
+      if (value === undefined || value === null || value === "") return;
+
+      normalized[item.name] = {
+        value: Number(value),
+        unit: item.unit || "unknown"
+      };
+    });
+
+    return normalized;
+  }
+
+  // OLD FLATTENING (COMMENTED AS REQUESTED — DO NOT REMOVE)
+  // const flattened = {};
+  const normalized = {};
+
+  for (const [name, value] of Object.entries(inputBiomarkers)) {
+    if (value == null) continue;
+
+    if (typeof value === "object") {
+      const numericValue = value.value ?? value.score ?? value.amount;
+      if (numericValue === undefined || numericValue === null || numericValue === "") continue;
+      normalized[name] = {
+        value: Number(numericValue),
+        unit: value.unit || "unknown"
+      };
+    } else {
+      normalized[name] = {
+        value: Number(value),
+        unit: "unknown"
+      };
+    }
+  }
+
+  return normalized;
+}
+
+// -------------------
+// BIO AGE FUNCTION
+// -------------------
+function calculateBiologicalAge(inputBiomarkers, age) {
+  if (age === undefined || age === null || age === "") {
+    throw new Error("Age is required");
+  }
+
+  const numericAge = Number(age);
+  if (Number.isNaN(numericAge)) {
+    throw new Error("Age must be a number");
+  }
+
+  const biomarkers = normalizeBiomarkerInput(inputBiomarkers);
+
+  if (!biomarkers || Object.keys(biomarkers).length === 0) {
+    throw new Error("No biomarkers provided");
+  }
+
+  const result = runBiologicalClock(
+    biomarkers,
+    numericAge,
+    biomarkerReference,
+    domainWeights
+  );
+
+  return {
+    biologicalAge: result.biologicalAge,
+    deltaAge: result.deltaAge,
+    compositeScore: result.compositeScore,
+    domainScores: result.domainScores,
+    severity: result.severity,
+    confidence: result.confidence
+  };
+}
+
+
+// -------------------
+// RISK FUNCTION (KEEP THIS)
+// -------------------
+function calculateRisk(painLevel) {
   if (painLevel === undefined || painLevel === null) {
-     console.error("❌ Pain level missing");
     throw new Error("Pain level is required");
   }
 
   const pain = Number(painLevel);
- console.log("🔢 Converted painLevel to number:", pain);
-  
-  // agar string aaya ya NaN aaya toh fail karo
+
   if (isNaN(pain)) {
-    console.error("❌ Pain level is not a number");
     throw new Error("Pain level must be a number");
   }
 
-  // unrealistic values block karo
   if (pain < 0 || pain > 10) {
-    console.error("❌ Pain level out of range");
     throw new Error("Pain level must be between 0 and 10");
   }
 
-  // Step 2: Risk Logic (highest first)
-  if (pain >= 7) {
-    console.log("⚠️ Risk level determined: High");
-    return "High"; // 7–10
-  }
-
-  if (pain >= 4) {
-    console.log("⚠️ Risk level determined: Moderate");
-    return "Moderate"; // 4–6
-  }
-
-  console.log("✅ Risk level determined: Low");
-  return "Low"; // 0–3
+  if (pain >= 7) return "High";
+  if (pain >= 4) return "Moderate";
+  return "Low";
 }
 
-module.exports = { calculateRisk };
+
+// -------------------
+// EXPORT BOTH
+// -------------------
+module.exports = {
+  calculateBiologicalAge,
+  calculateRisk
+};

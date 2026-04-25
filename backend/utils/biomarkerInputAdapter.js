@@ -4,8 +4,18 @@ const biomarkerReference = require("../db/biomarkerReference");
 
 function buildBiomarkerMap(array) {
   const map = {};
+  const deduped = {};
 
   array.forEach(b => {
+    if (!b || !b.name) return;
+
+    const dedupeKey = normalizeName(b.name);
+    if (!dedupeKey) return;
+
+    deduped[dedupeKey] = b;
+  });
+
+  Object.values(deduped).forEach(b => {
     const name = normalizeName(b.name);
 
     if (!name) return;

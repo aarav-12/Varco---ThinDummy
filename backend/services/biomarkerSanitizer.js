@@ -11,6 +11,7 @@ function normalizeUnits(biomarkers) {
     CRP: { min: 0.01, max: 50 }
   };
 
+  /*
   function normalizeUnit(unit) {
     if (!unit) return "";
 
@@ -19,6 +20,26 @@ function normalizeUnits(biomarkers) {
       .replace(/[µμ]/g, "u")
       .replace(/\s/g, "")
       .replace(/\/1\.73m2$/, "");
+  }
+  */
+
+  function normalizeUnit(unit) {
+    if (!unit) return "";
+
+    let u = unit
+      .toLowerCase()
+      .replace(/[µμ]/g, "u")
+      .replace(/\s+/g, "")
+      .replace(/\/1\.73m2$/, "");
+
+    // 🔥 STANDARDIZE COMMON UNITS
+    if (u === "mg/dl") return "mg/dL";
+    if (u === "mg/l") return "mg/L";
+    if (u === "ng/ml") return "ng/mL";
+    if (u === "pg/ml") return "pg/mL";
+    if (u === "g/dl") return "g/dL";
+
+    return u;
   }
 
   function isPlausible(key, value) {

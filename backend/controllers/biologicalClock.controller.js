@@ -75,8 +75,19 @@ const calculateBiologicalAgeController = async (req, res) => {
 
     const biomarkers = buildBiomarkerMap(biomarkersArray);
 
+    // 🔴 FINAL GUARD — DO NOT MOVE THIS
+    if (biomarkers["HbA1c"]) {
+      delete biomarkers["FastingGlucose"];
+      delete biomarkers["AverageBloodGlucose"];
+    }
+
     // ✅ STEP 2 — MAP
     const { mapped: mappedBiomarkers, rejected: mappingRejected } = mapBiomarkers(biomarkers);
+
+    const validKeys = Object.keys(mappedBiomarkers).filter(
+      k => biomarkerReference[k]
+    );
+    console.log("REAL BIOMARKER COUNT:", validKeys.length);
 
     if (Object.keys(mappedBiomarkers).length === 0) {
       return res.status(200).json({

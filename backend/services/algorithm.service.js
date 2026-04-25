@@ -62,66 +62,30 @@ function runAlgorithm({ biomarkers, age }) {
 
   const zScores = calculateZScores(flattened, biomarkerReference);
   const severity = applyDirectionality(zScores, biomarkerReference);
+  // OLD SEVERITY FLOW (COMMENTED AS REQUESTED — DO NOT REMOVE)
+  // const domainScores = calculateDomainScores(severity, biomarkerReference);
+
   const domainScores = calculateDomainScores(severity, biomarkerReference);
 
   console.log("📊 DOMAIN SCORES:", domainScores);
 
-  const compositeScore = calculateCompositeScore(
-    domainScores,
-    domainWeights
-  );
+  const compositeScore = calculateCompositeScore(domainScores, domainWeights);
 
-  // 🚀 COVERAGE FIX
-  const expectedDomains = 7;
-  const activeDomains = Object.values(domainScores).filter(v => v > 0).length;
-  const coverageFactor = 0.85 + 0.15 * (activeDomains / expectedDomains);
-
-  const adjustedCompositeScore = compositeScore * coverageFactor;
-
-  console.log("📊 ADJUSTED COMPOSITE:", adjustedCompositeScore);
-
-  // 🔥 STEP 3 — NON-LINEAR AMPLIFICATION (MAIN FIX)
-  const amplified =
-    adjustedCompositeScore * (1 + 0.8 * adjustedCompositeScore);
-
-  // 🔥 STEP 4 — BASE DELTA
-  let delta = amplified * 8;
-
-  // 🔥 STEP 5 — HIGH-RISK BOOST (CRITICAL FIX)
-  let riskBoost = 0;
-
-  if (flattened.IL6 && flattened.IL6 > 20) {
-    riskBoost += 1.5;
-  }
-
-  if (flattened.MDA && flattened.MDA > 30) {
-    riskBoost += 1;
-  }
-
-  if (flattened.Triglycerides && flattened.Triglycerides > 150) {
-    riskBoost += 0.5;
-  }
-
-  if (flattened.CRPExtreme && flattened.CRPExtreme > 5) {
-    riskBoost += 0.5;
-  }
-
-  // 🔥 STEP 6 — FINAL AGE
-  const biologicalAge = age + delta + riskBoost;
+  const ageResult = calculateBiologicalAge(compositeScore, age);
 
   const domainContributions = calculateDomainContributions(
     domainScores,
     domainWeights
   );
 
-  const riskScore = calculateRiskScore(adjustedCompositeScore);
+  const riskScore = calculateRiskScore(compositeScore);
 
   let confidence = calculateConfidence(flattened, biomarkerReference);
   confidence = confidence * confidenceMultiplier;
 
   return {
-    biologicalAge: Number(biologicalAge.toFixed(1)),
-    deltaAge: Number((biologicalAge - age).toFixed(2)),
+    biologicalAge: ageResult.biologicalAge,
+    deltaAge: ageResult.deltaAge,
 
     matched,
     rejected,
@@ -129,12 +93,12 @@ function runAlgorithm({ biomarkers, age }) {
     domainScores,
     domainContributions,
 
-    compositeScore: adjustedCompositeScore,
+    compositeScore,
     rawCompositeScore: compositeScore,
 
     riskScore,
 
-    severity,
+    severity: cappedSeverity,
     zScores,
 
     confidence,

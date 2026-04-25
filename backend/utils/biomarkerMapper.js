@@ -10,7 +10,8 @@ const aliasMap = {
   "hs-crp",
   "creactiveprotein",
   "creactiveproteincrp",
-  "c reactive protein"
+  "c reactive protein",
+  "c-reactive protein"
 ],
 
   HbA1c: ["hba1c", "hba1c%", "hb a1c", "glycatedhemoglobin"],
@@ -21,18 +22,23 @@ const aliasMap = {
     "fasting blood glucose",
     "fasting sugar",
     "fbs",
-    "averagebloodglucose"
+    "averagebloodglucose",
+    "average blood glucose",
+    "avg glucose"
   ],
 
   // 🧬 OXIDATIVE / INFLAMMATION
   MDA: ["mda", "malondialdehyde"],
   IL6: ["il6", "il-6", "interleukin6"],
+  CKM: ["creatine kinase", "ckm"],
 
   // 💪 MUSCLE
   CKMM: [
     "ckmm",
     "ck-mm",
     "ckm",
+    "creatine kinase",
+    "creatine kinase muscle",
     "creatinekinasemuscle"
   ],
 
@@ -153,6 +159,17 @@ function normalizeName(name) {
     .replace(/[^a-z0-9]/g, "");
 }
 
+function normalizeUnit(unit) {
+  const clean = String(unit || "")
+    .replace(/\s+/g, "")
+    .toLowerCase();
+
+  if (clean === "mg/dl") return "mg/dL";
+  if (clean === "ng/ml") return "ng/mL";
+
+  return unit || "unknown";
+}
+
 
 // 🔥 MAIN MAPPER
 function mapBiomarkers(inputBiomarkers) {
@@ -161,14 +178,61 @@ function mapBiomarkers(inputBiomarkers) {
 
   for (const key in inputBiomarkers) {
 
-    const rawName = extractShortName(key);
+    const rawName = extractShortName(key)
+      .replace(/\bH\s*D\s*L\b\s*Cholesterol/gi, "HDL")
+      .replace(/\bL\s*D\s*L\b\s*Cholesterol/gi, "LDL")
+      .replace(/\bVEGF\s*-\s*A\b/gi, "VEGF")
+      .replace(/\bInterleukin\s*[- ]?6\b/gi, "IL6");
+    const name = rawName;
     const clean = normalizeName(rawName);
     console.log("🔍 CHECK:", key, "→", clean);
 
     let found = null;
 
+    if (name.toLowerCase().includes("pth")) {
+      found = "PTH";
+    }
+    if (!found && name.toLowerCase().includes("parathormone")) {
+      found = "PTH";
+    }
+
+    // OLD LIPID MATCHING (COMMENTED AS REQUESTED — DO NOT REMOVE)
+    // if (!found && /vldl/i.test(rawName)) {
+    //   found = "VLDL";
+    // } else if (!found && /ldl/i.test(rawName)) {
+    //   found = "LDL";
+    // }
+
+    // OLD HDL MATCHING (COMMENTED AS REQUESTED — DO NOT REMOVE)
+    // if (/nonhdl/i.test(name)) {
+    //   found = "NonHDL";
+    // }
+    // else if (/hdl/i.test(name) && !/nonhdl/i.test(name)) {
+    //   found = "HDL";
+    // }
+
+    // OLD NON-HDL MATCH (COMMENTED AS REQUESTED — DO NOT REMOVE)
+    // if (/nonhdl/i.test(name)) {
+    //   found = "NonHDL";
+    // }
+    // else if (/\bhdl\b/i.test(name)) {
+    //   found = "HDL";
+    // }
+
+    if (/non\s*hdl/i.test(name) || /nonhdl/i.test(clean)) {
+      found = "NonHDL";
+    }
+    else if (/\bhdl\b/i.test(name)) {
+      found = "HDL";
+    }
+    else if (!found && /vldl/i.test(rawName)) {
+      found = "VLDL";
+    } else if (!found && /ldl/i.test(rawName)) {
+      found = "LDL";
+    }
+
     // 🔒 HARDCODED PRIORITY MATCHES (CRITICAL FIX)
-    if (clean.includes("tgf")) {
+    if (!found && clean.includes("tgf")) {
       found = "TGFb1";
     }
 
@@ -177,6 +241,10 @@ function mapBiomarkers(inputBiomarkers) {
         const normalizedAliases = aliasMap[canonical].map(a =>
           normalizeName(a)
         );
+
+        if (canonical === "VLDL" || canonical === "LDL") {
+          continue;
+        }
 
         // 1. EXACT MATCH FIRST
         if (normalizedAliases.includes(clean)) {
@@ -192,6 +260,10 @@ function mapBiomarkers(inputBiomarkers) {
         const normalizedAliases = aliasMap[canonical].map(a =>
           normalizeName(a)
         );
+
+        if (canonical === "VLDL" || canonical === "LDL") {
+          continue;
+        }
 
         if (
           normalizedAliases.some(a => clean.includes(a)) ||
@@ -237,7 +309,7 @@ function mapBiomarkers(inputBiomarkers) {
     }
 
     // 🔥 UNIT NORMALIZATION
-    if (unit.toLowerCase() === "mg/dl") unit = "mg/dL";
+    unit = normalizeUnit(unit);
 
     // 🔥 PRIORITY LOGIC (AI > fallback)
     if (!mapped[found]) {

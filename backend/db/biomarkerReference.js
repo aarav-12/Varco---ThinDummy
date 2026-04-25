@@ -8,9 +8,11 @@ const biomarkerReference = {
 
   // 🫀 VAF — Arterio-Vascular
   TotalCholesterol: { mean: 190, sd: 30, direction: "high_worse", domain: "VAF", unit: "mg/dL" },
+  NonHDL: { mean: 130, sd: 30, direction: "high_worse", domain: "VAF", unit: "mg/dL" },
   LDL: { mean: 100, sd: 30, direction: "high_worse", domain: "VAF", unit: "mg/dL" },
   HDL: { mean: 55, sd: 15, direction: "low_worse", domain: "VAF", unit: "mg/dL" },
   Triglycerides: { mean: 130, sd: 40, direction: "high_worse", domain: "VAF", unit: "mg/dL" },
+  VLDL: { mean: 20, sd: 10, direction: "high_worse", domain: "VAF", unit: "mg/dL" },
   VEGF: { mean: 200, sd: 80, direction: "low_worse", domain: "VAF", unit: "pg/mL" },
 
   // 🦴 BMF — Bone Metabolism

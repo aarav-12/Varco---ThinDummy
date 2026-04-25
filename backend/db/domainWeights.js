@@ -1,11 +1,11 @@
 const domainWeights = {
-  IRF: 0.18,
-  VAF: 0.18,
-  CMF: 0.16,
-  BMF: 0.13,
-  MHF: 0.12,
-  PNF: 0.10,
-  RFF: 0.09
+  MHF: 0.15,
+  PNF: 0.15,
+  VAF: 0.15,
+  IRF: 0.15,
+  BMF: 0.15,
+  CMF: 0.15,
+  RFF: 0.10
 };
 
 module.exports = domainWeights;
