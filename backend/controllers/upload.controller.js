@@ -484,6 +484,7 @@ const uploadReport = async (req, res) => {
     const delta = result.deltaAge;
     const compositeScore = result.compositeScore;
     const domainScores = result.domainScores;
+    const severity = result.severity;
 
     // OLD RESPONSE (commented as requested)
     // return res.json({
@@ -492,20 +493,21 @@ const uploadReport = async (req, res) => {
     // });
 
     return res.json({
-      bioAge,
+      biologicalAge: bioAge,
       chronologicalAge: age,
-      delta,
+      deltaAge: delta,
       compositeScore,
       domainScores,
+      severity,
 
-      // RAW BIOMARKERS (from extraction)
+      // ✅ RAW (from extraction)
       biomarkers: rawArray.map((b) => ({
         name: b.name,
         value: b.value,
         unit: b.unit,
       })),
 
-      // CLEAN / MAPPED BIOMARKERS (used in scoring)
+      // ✅ CLEAN (used in scoring)
       mappedBiomarkers: Object.entries(finalMap).map(([key, val]) => ({
         name: key,
         value: val.value,
