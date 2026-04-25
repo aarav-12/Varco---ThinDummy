@@ -2,7 +2,8 @@
 /* eslint-disable no-undef */
 
 const pool = require("../db");
-const { calculateBiologicalAge } = require("../services/scoring.service");
+const { runAlgorithm } = require("../services/algorithm.service");
+const { mapBiomarkers } = require("../utils/biomarkerMapper");
 const { generateExplanation } = require("../services/ai.service");
 
 // ================= CREATE PATIENT =================
@@ -31,20 +32,23 @@ exports.submitPatient = async (req, res) => {
 
     console.log("✅ STEP 1: Validation passed");
 
-    const { biomarkers, age: requestAge } = req.body;
+    const { age: requestAge } = req.body;
 
-    // 🔥 convert array → object map
-    const biomarkerMap = {};
+    const inputObject = {};
 
-    if (Array.isArray(biomarkers)) {
-      biomarkers.forEach(b => {
-        if (b.name && b.value !== undefined) {
-          biomarkerMap[b.name] = {
-            value: Number(b.value),
-            unit: b.unit || ""
-          };
-        }
-      });
+    (req.body.biomarkers || []).forEach(b => {
+      if (!b?.name) return;
+
+      inputObject[b.name] = {
+        value: b.value,
+        unit: b.unit
+      };
+    });
+
+    const { mapped } = mapBiomarkers(inputObject);
+
+    if (Object.keys(mapped).length === 0) {
+      throw new Error("No valid biomarkers after mapping");
     }
 
     // 🔥 ensure age is number
@@ -56,44 +60,17 @@ exports.submitPatient = async (req, res) => {
       symptoms: symptoms || null,
       canWalk: canWalk ?? null,
       hasSwelling: hasSwelling ?? null,
-      biomarkers: biomarkerMap,
+      biomarkers: inputObject,
       age: safeAge
     };
-
-    function fixDetectedUnits(biomarkers) {
-      const defaults = {
-        CRP: "mg/L",
-        LDL: "mg/dL",
-        HDL: "mg/dL",
-        Triglycerides: "mg/dL",
-        VitaminD: "ng/mL",
-        Creatinine: "mg/dL"
-      };
-
-      const fixed = {};
-
-      for (const key in biomarkers) {
-        const biomarker = biomarkers[key];
-
-        if (biomarker.unit === "detected") {
-          fixed[key] = {
-            value: biomarker.value,
-            unit: defaults[key] || "unknown"
-          };
-        } else {
-          fixed[key] = biomarker;
-        }
-      }
-
-      return fixed;
-    }
-
-    const normalizedBiomarkers = fixDetectedUnits(biomarkerMap);
 
     // ================= ALGORITHM =================
     console.log("🧠 STEP 2: Running algorithm...");
 
-    const result = calculateBiologicalAge(normalizedBiomarkers, numericAge);
+    const result = runAlgorithm({
+      biomarkers: mapped,
+      age: req.body.age
+    });
 
     console.log("✅ STEP 2 DONE:", result);
 
@@ -145,7 +122,7 @@ exports.submitPatient = async (req, res) => {
         safeAge,
         gender || null,
         rawInputs,
-        normalizedBiomarkers,
+        mapped,
         result.severity,
         safeBiologicalAge, // ✅ FIXED
         safeAge,
@@ -160,7 +137,7 @@ exports.submitPatient = async (req, res) => {
       patientId: dbResult.rows[0].id,
       biologicalAge: safeBiologicalAge,
       deviation: safeDeviation,
-      biomarkers: normalizedBiomarkers,
+      biomarkers: mapped,
       severity: result.severity,
       aiSummary
     });

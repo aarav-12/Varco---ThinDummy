@@ -45,7 +45,7 @@ const aliasMap = {
   AldolaseA: ["aldolase", "aldolasea"],
 
   // 🫀 LIPIDS
-  LDL: ["ldl", "ldlcholesterol"],
+  LDL: ["ldl", "ldlcholesterol", "lowdensitylipoprotein"],
   HDL: ["hdl", "hdlcholesterol"],
   Triglycerides: ["triglycerides", "tg"],
   TotalCholesterol: [
@@ -228,7 +228,7 @@ function mapBiomarkers(inputBiomarkers) {
     }
     else if (!found && /vldl/i.test(rawName)) {
       found = "VLDL";
-    } else if (!found && /ldl/i.test(rawName)) {
+    } else if (!found && (/ldl/i.test(rawName) || /low\s*density\s*lipoprotein/i.test(name) || clean.includes("lowdensitylipoprotein"))) {
       found = "LDL";
     }
 

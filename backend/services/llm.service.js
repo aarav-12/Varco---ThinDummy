@@ -16,48 +16,17 @@ const callLLM = async (messages, mode = "chat") => {
       throw new Error("CLAUDE_API_KEY is missing in .env");
     }
 
-    let systemPrompt;
-    let maxTokens;
-
-    // 🔥 MODE SWITCH
-    if (mode === "extract") {
-      systemPrompt = `
-You are a medical lab report extraction engine.
-
-STRICT RULES:
-
-- Extract numbers EXACTLY as written in the report
-- DO NOT modify decimals
-- DO NOT divide, multiply, round, or normalize values
-- DO NOT infer units
-- DO NOT guess
-- DO NOT fix anything
-
-CRITICAL EXAMPLES:
-31.266 must remain 31.266
-109.428 must remain 109.428
-
-If you output 3.1266 instead of 31.266 -> YOU ARE WRONG
-
-OUTPUT FORMAT:
-{
-  "biomarkers": [
-    { "name": string, "value": number, "unit": string }
-  ]
-}
-
-RULES:
-- ONLY JSON
-- NO markdown
-- NO explanation
-- NO truncation
-
-If unsure -> SKIP the biomarker
-`;
-      maxTokens = 2000;
-    } else {
-      // 💬 CHAT MODE
-      systemPrompt = `
+    // EXTRACTION MODE DISABLED (commented out on request)
+    // if (mode === "extract") {
+    //   systemPrompt = `
+    // You are a medical lab report extraction engine.
+    // ...
+    // `;
+    //   maxTokens = 2000;
+    // } else {
+      
+    // 💬 CHAT MODE ONLY
+    const systemPrompt = `
 You are Predict Health AI, a concise health assistant.
 
 RULES:
@@ -67,8 +36,7 @@ RULES:
 - No bullet points
 - Answer directly
 `;
-      maxTokens = 300;
-    }
+    const maxTokens = 300;
 
     const response = await fetch(
       "https://api.anthropic.com/v1/messages",
@@ -111,20 +79,20 @@ RULES:
       console.log("🧠 RAW LLM OUTPUT:", output);
     }
 
-    // 🔥 CLEAN ONLY FOR EXTRACT MODE
-    if (mode === "extract") {
-      output = output.replace(/```json|```/g, "").trim();
-    }
+    // EXTRACTION OUTPUT CLEANUP DISABLED (commented out on request)
+    // if (mode === "extract") {
+    //   output = output.replace(/```json|```/g, "").trim();
+    // }
 
     return output;
 
   } catch (error) {
     console.error("🔥 CLAUDE ERROR:", error.message);
 
-    // 🔒 SAFE FALLBACKS
-    if (mode === "extract") {
-      return JSON.stringify({ biomarkers: [] });
-    }
+    // EXTRACTION FALLBACK DISABLED (commented out on request)
+    // if (mode === "extract") {
+    //   return JSON.stringify({ biomarkers: [] });
+    // }
 
     return "AI is currently unavailable. Please try again later.";
   }
