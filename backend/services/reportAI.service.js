@@ -208,6 +208,7 @@ async function processReport(fullText, age, file) {
   }
 
   const { mapped, rejected } = mapBiomarkers(inputObject);
+  const finalMap = mapped;
 
   console.log("✅ MAPPED COUNT:", Object.keys(mapped).length);
   console.log("❌ REJECTED:", rejected);
@@ -232,16 +233,20 @@ async function processReport(fullText, age, file) {
     severity: result.severity
   });
 
+  const biomarkers = Object.entries(finalMap).map(([key, val]) => ({
+    name: key,
+    value: val.value,
+    unit: val.unit,
+  }));
+
   return {
-    ...result,
-    ageUsed,
-    ageSource,
-    reportAge,
-    ageConfidence,
-    ageConflict,
-    ageFromForm: frontendAge,
-    ageFromDob: dobAge,
-    report
+    biologicalAge: result.biologicalAge,
+    deltaAge: result.deltaAge,
+    compositeScore: result.compositeScore,
+    domainScores: result.domainScores,
+    severity: result.severity,
+
+    biomarkers,
   };
 }
 
