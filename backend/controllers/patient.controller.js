@@ -112,6 +112,17 @@ exports.submitPatient = async (req, res) => {
     // ================= DB =================
     console.log("🗄️ STEP 4: Inserting into DB...");
 
+    // 🔎 DEBUG — BEFORE SAVE
+    const list = Array.isArray(mapped)
+      ? mapped
+      : Object.entries(mapped || {}).map(([name, value]) => ({
+          name,
+          ...(value && typeof value === "object" ? value : {})
+        }));
+
+    console.log("🧪 BEFORE SAVE COUNT:", list.length);
+    console.log("🧪 BEFORE SAVE KEYS:", list.map(b => b.name));
+
     const dbResult = await pool.query(
       `INSERT INTO patients 
       (name, age, gender, raw_inputs, biomarkers, risk_scores, biological_age, chronological_age, ai_summary)
@@ -207,6 +218,17 @@ exports.getPatientById = async (req, res) => {
 
     const p = result.rows[0];
 
+    // 🔎 DEBUG — AFTER DB READ
+    const raw = Array.isArray(p?.biomarkers)
+      ? p.biomarkers
+      : Object.entries(p?.biomarkers || {}).map(([name, value]) => ({
+          name,
+          ...(value && typeof value === "object" ? value : {})
+        }));
+
+    console.log("🗄️ DB READ COUNT:", raw.length);
+    console.log("🗄️ DB READ KEYS:", raw.map(b => b.name));
+
     // 🔥 BUILD BIOMARKERS BY DOMAIN (NEW)
     const DOMAIN_STRUCTURE = {
       IRF: ["CRP", "IL6", "MDA"],
@@ -229,6 +251,17 @@ exports.getPatientById = async (req, res) => {
         }
       }
     }
+
+    // 🔎 DEBUG — BEFORE GET RESPONSE
+    const responseList = Array.isArray(p?.biomarkers)
+      ? p.biomarkers
+      : Object.entries(p?.biomarkers || {}).map(([name, value]) => ({
+          name,
+          ...(value && typeof value === "object" ? value : {})
+        }));
+
+    console.log("📤 GET COUNT:", responseList.length);
+    console.log("📤 GET KEYS:", responseList.map(b => b.name));
 
     return res.json({
       success: true,
