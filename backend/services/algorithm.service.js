@@ -6,6 +6,7 @@ const {
   applyDirectionality,
   calculateDomainScores,
   calculateCompositeScore,
+  calculateBiologicalAge,
   calculateConfidence,
   calculateDomainContributions,
   calculateRiskScore
@@ -62,6 +63,7 @@ function runAlgorithm({ biomarkers, age }) {
 
   const zScores = calculateZScores(flattened, biomarkerReference);
   const severity = applyDirectionality(zScores, biomarkerReference);
+  const cappedSeverity = severity;
   // OLD SEVERITY FLOW (COMMENTED AS REQUESTED — DO NOT REMOVE)
   // const domainScores = calculateDomainScores(severity, biomarkerReference);
 
@@ -79,6 +81,10 @@ function runAlgorithm({ biomarkers, age }) {
   );
 
   const riskScore = calculateRiskScore(compositeScore);
+
+  const activeDomains = Object.keys(domainScores).length;
+  const totalDomains = Math.max(Object.keys(domainWeights || {}).length, 1);
+  const coverageFactor = Number((activeDomains / totalDomains).toFixed(2));
 
   let confidence = calculateConfidence(flattened, biomarkerReference);
   confidence = confidence * confidenceMultiplier;
