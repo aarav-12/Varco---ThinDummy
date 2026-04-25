@@ -112,10 +112,17 @@ exports.submitPatient = async (req, res) => {
     // ================= DB =================
     console.log("🗄️ STEP 4: Inserting into DB...");
 
+    const biomarkers = req.body.biomarkers ?? mapped;
+
+    // 🔥 ENSURE NO BIOMARKER IS DROPPED
+    const safeBiomarkers = Array.isArray(biomarkers)
+      ? biomarkers
+      : Object.values(biomarkers || {});
+
     // 🔎 DEBUG — BEFORE SAVE
-    const list = Array.isArray(mapped)
-      ? mapped
-      : Object.entries(mapped || {}).map(([name, value]) => ({
+    const list = Array.isArray(safeBiomarkers)
+      ? safeBiomarkers
+      : Object.entries(safeBiomarkers || {}).map(([name, value]) => ({
           name,
           ...(value && typeof value === "object" ? value : {})
         }));
@@ -133,7 +140,7 @@ exports.submitPatient = async (req, res) => {
         safeAge,
         gender || null,
         rawInputs,
-        mapped,
+        safeBiomarkers,
         result.severity,
         safeBiologicalAge, // ✅ FIXED
         safeAge,
@@ -148,7 +155,7 @@ exports.submitPatient = async (req, res) => {
       patientId: dbResult.rows[0].id,
       biologicalAge: safeBiologicalAge,
       deviation: safeDeviation,
-      biomarkers: mapped,
+      biomarkers: safeBiomarkers,
       severity: result.severity,
       aiSummary
     });
