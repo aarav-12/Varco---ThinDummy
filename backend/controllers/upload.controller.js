@@ -486,33 +486,21 @@ const uploadReport = async (req, res) => {
     const domainScores = result.domainScores;
     const severity = result.severity;
 
-    // OLD RESPONSE (commented as requested)
-    // return res.json({
-    //   success: true,
-    //   data: result
-    // });
+    const biomarkers = Object.entries(finalMap).map(([key, val]) => ({
+      name: key,
+      value: val.value,
+      unit: val.unit,
+    }));
 
-    return res.json({
+    res.json({
       biologicalAge: bioAge,
-      chronologicalAge: age,
       deltaAge: delta,
       compositeScore,
       domainScores,
       severity,
 
-      // ✅ RAW (from extraction)
-      biomarkers: rawArray.map((b) => ({
-        name: b.name,
-        value: b.value,
-        unit: b.unit,
-      })),
-
-      // ✅ CLEAN (used in scoring)
-      mappedBiomarkers: Object.entries(finalMap).map(([key, val]) => ({
-        name: key,
-        value: val.value,
-        unit: val.unit,
-      })),
+      // 🚀 THIS FIXES EVERYTHING
+      biomarkers,
     });
     }
     // LEGACY PATH END (DISABLED)
