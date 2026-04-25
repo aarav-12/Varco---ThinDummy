@@ -1,3 +1,103 @@
+/* eslint-disable no-undef */
+
+const { callLLM } = require("./llm.service");
+const { chunkText } = require("../utils/chunkText");
+const { calculateBiologicalAge } = require("./scoring.service");
+const { mapBiomarkers } = require("../utils/biomarkerMapper");
+const axios = require("axios");
+const FormData = require("form-data");
+
+function mergeBiomarkers(biomarkersArray) {
+  const map = {};
+
+  for (const b of biomarkersArray || []) {
+    if (!b || !b.name) continue;
+
+    const key = b.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    if (!map[key]) {
+      map[key] = b;
+    }
+  }
+
+  return Object.values(map);
+}
+
+async function callWithRetry(messages, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await callLLM(messages, "extract");
+
+      if (
+        res &&
+        !res.includes("AI is currently unavailable") &&
+        !res.includes("Overloaded")
+      ) {
+        return res;
+      }
+
+      await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+    } catch (err) {
+      await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+    }
+  }
+
+  return null;
+}
+
+async function extractBiomarkersFromText(fullText) {
+  const chunks = chunkText(fullText, 6000);
+  let allBiomarkers = [];
+
+  for (const chunk of chunks) {
+    try {
+      const response = await callWithRetry([{ role: "user", content: chunk }]);
+
+      if (!response) {
+        continue;
+      }
+
+      const cleaned = response.replace(/```json|```/g, "").trim();
+      const parsed = JSON.parse(cleaned);
+
+      if (parsed.biomarkers) {
+        allBiomarkers.push(...parsed.biomarkers);
+      }
+
+      await new Promise(r => setTimeout(r, 800));
+    } catch (err) {
+      // Skip malformed chunk output
+    }
+  }
+
+  return allBiomarkers;
+}
+
+async function extractBiomarkersFromPython(file) {
+  if (!file?.buffer) {
+    throw new Error("Missing upload buffer for Python extraction");
+  }
+
+  const form = new FormData();
+  form.append("file", file.buffer, {
+    filename: file.originalname || "report.pdf",
+    contentType: file.mimetype || "application/pdf"
+  });
+
+  const response = await axios.post(
+    process.env.PYTHON_API_URL,
+    form,
+    {
+      headers: form.getHeaders(),
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+      timeout: 30000
+    }
+  );
+
+  return response?.data || {};
+}
+
 async function processReport(fullText, age, file) {
   const normalizeAge = (raw) => {
     const n = Number(raw);
@@ -110,3 +210,9 @@ async function processReport(fullText, age, file) {
     ageSource
   };
 }
+
+module.exports = {
+  extractBiomarkersFromText,
+  mergeBiomarkers,
+  processReport
+};
