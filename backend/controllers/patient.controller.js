@@ -2,7 +2,7 @@
 /* eslint-disable no-undef */
 
 const pool = require("../db");
-const { runAlgorithm } = require("../services/algorithm.service");
+const { calculateBiologicalAge } = require("../services/scoring.service");
 const { generateExplanation } = require("../services/ai.service");
 
 // ================= CREATE PATIENT =================
@@ -93,10 +93,7 @@ exports.submitPatient = async (req, res) => {
     // ================= ALGORITHM =================
     console.log("🧠 STEP 2: Running algorithm...");
 
-    const result = runAlgorithm({
-      biomarkers: normalizedBiomarkers,
-      age: numericAge
-    });
+    const result = calculateBiologicalAge(normalizedBiomarkers, numericAge);
 
     console.log("✅ STEP 2 DONE:", result);
 
@@ -109,8 +106,8 @@ exports.submitPatient = async (req, res) => {
       ? Math.round(result.biologicalAge)
       : null;
 
-    const safeDeviation = Number.isFinite(result.deviation)
-      ? result.deviation
+    const safeDeviation = Number.isFinite(result.deltaAge)
+      ? result.deltaAge
       : null;
 
     console.log("🧪 SANITIZED:", {
@@ -126,7 +123,7 @@ exports.submitPatient = async (req, res) => {
 
       aiSummary = await generateExplanation({
         deviation: safeDeviation,
-        severity: result.biomarkerSeverity
+        severity: result.severity
       });
 
       console.log("✅ STEP 3 DONE: AI response received");
@@ -148,8 +145,8 @@ exports.submitPatient = async (req, res) => {
         safeAge,
         gender || null,
         rawInputs,
-        result.biomarkers,
-        result.biomarkerSeverity,
+        normalizedBiomarkers,
+        result.severity,
         safeBiologicalAge, // ✅ FIXED
         safeAge,
         aiSummary
@@ -163,8 +160,8 @@ exports.submitPatient = async (req, res) => {
       patientId: dbResult.rows[0].id,
       biologicalAge: safeBiologicalAge,
       deviation: safeDeviation,
-      biomarkers: result.biomarkers,
-      severity: result.biomarkerSeverity,
+      biomarkers: normalizedBiomarkers,
+      severity: result.severity,
       aiSummary
     });
 
