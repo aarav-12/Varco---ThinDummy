@@ -74,6 +74,7 @@ const aliasMap = {
   eGFR: ["egfr"],
 
   // 🦴 BONE / HORMONAL
+  B12: ["vitaminb12", "b12"],
   VitaminD: [
   "vitamind",
   "vitamin d",

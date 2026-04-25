@@ -479,9 +479,38 @@ const uploadReport = async (req, res) => {
 
     console.log("===== FINAL BIO AGE =====", result.biologicalAge);
 
+    const finalMap = finalStrict;
+    const bioAge = result.biologicalAge;
+    const delta = result.deltaAge;
+    const compositeScore = result.compositeScore;
+    const domainScores = result.domainScores;
+
+    // OLD RESPONSE (commented as requested)
+    // return res.json({
+    //   success: true,
+    //   data: result
+    // });
+
     return res.json({
-      success: true,
-      data: result
+      bioAge,
+      chronologicalAge: age,
+      delta,
+      compositeScore,
+      domainScores,
+
+      // RAW BIOMARKERS (from extraction)
+      biomarkers: rawArray.map((b) => ({
+        name: b.name,
+        value: b.value,
+        unit: b.unit,
+      })),
+
+      // CLEAN / MAPPED BIOMARKERS (used in scoring)
+      mappedBiomarkers: Object.entries(finalMap).map(([key, val]) => ({
+        name: key,
+        value: val.value,
+        unit: val.unit,
+      })),
     });
     }
     // LEGACY PATH END (DISABLED)

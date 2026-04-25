@@ -40,6 +40,7 @@ const biomarkerReference = {
 
   // 🧠 PNF — Peripheral Neuro
   BDNF: { mean: 25, sd: 10, direction: "low_worse", domain: "PNF", unit: "ng/mL" },
+  B12: { mean: 600, sd: 150, direction: "low_worse", domain: "PNF" },
   SP: { mean: 200, sd: 80, direction: "low_worse", domain: "PNF", unit: "pg/mL" },
   TGFb1: { mean: 10, sd: 5, direction: "high_worse", domain: "VAF", unit: "ng/mL" },
 
