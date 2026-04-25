@@ -161,8 +161,27 @@ async function processReport(fullText, age, file) {
   const merged = mergeBiomarkers(rawBiomarkers);
   console.log("🧼 MERGED:", merged);
 
+  const SAFE_ALIAS = {
+    "hba1c": "CMF - Cardiometabolic | HbA1c | <5.7 |",
+    "ldl": "CMF - Cardiometabolic | LDL | <100 |"
+  };
+
+  function safeNormalize(name) {
+    const key = name.toLowerCase().replace(/[\s\-]/g, "");
+    return SAFE_ALIAS[key] || name;
+  }
+
+  let biomarkers = merged;
+
+  biomarkers = biomarkers
+    .map(b => ({
+      ...b,
+      name: safeNormalize(b.name)
+    }))
+    .filter(b => b.name.includes("|"));
+
   // ✅ THIS IS WHAT FRONTEND NEEDS
-  const rawBiomarkerArray = merged.map(b => ({
+  const rawBiomarkerArray = biomarkers.map(b => ({
     name: b.name,
     value: b.value,
     unit: b.unit
@@ -171,7 +190,7 @@ async function processReport(fullText, age, file) {
   // 🔥 STEP 4 — MAP FOR SCORING ONLY
   const inputObject = {};
 
-  for (const b of merged) {
+  for (const b of biomarkers) {
     if (!b?.name || b.value == null) continue;
 
     inputObject[b.name] = {
