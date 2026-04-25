@@ -266,7 +266,7 @@ const uploadReport = async (req, res) => {
     const clean = sanitizeBiomarkers(rawArray);
     console.log("🧼 CLEANED:", clean);
 
-    let biomarkers = clean;
+    let cleanedBiomarkers = clean;
 
     // const normalizeKey = (name) =>
     //   name
@@ -309,7 +309,7 @@ const uploadReport = async (req, res) => {
 
     const deduped = {};
 
-    biomarkers.forEach(b => {
+    cleanedBiomarkers.forEach(b => {
       if (!b || !b.name) return;
 
       const key = b.name
@@ -322,9 +322,9 @@ const uploadReport = async (req, res) => {
       deduped[key] = b;
     });
 
-    biomarkers = Object.values(deduped);
+    cleanedBiomarkers = Object.values(deduped);
 
-    const map = buildBiomarkerMap(biomarkers);
+    const map = buildBiomarkerMap(cleanedBiomarkers);
 
     console.log("🧠 FINAL MAP:", map);
 
